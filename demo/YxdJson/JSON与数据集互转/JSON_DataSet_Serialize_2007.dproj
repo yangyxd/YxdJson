@@ -1,0 +1,143 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <ProjectGuid>{cc48b93a-3e6b-4fe0-92f9-869afc3ef4c1}</ProjectGuid>
+    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
+    <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
+    <DCC_DCCCompiler>DCC32</DCC_DCCCompiler>
+    <DCC_DependencyCheckOutputName>..\..\..\bin\JSON_DataSet_Serialize_2007.exe</DCC_DependencyCheckOutputName>
+    <MainSource>JSON_DataSet_Serialize_2007.dpr</MainSource>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
+    <Version>7.0</Version>
+    <DCC_DebugInformation>False</DCC_DebugInformation>
+    <DCC_LocalDebugSymbols>False</DCC_LocalDebugSymbols>
+    <DCC_SymbolReferenceInfo>0</DCC_SymbolReferenceInfo>
+    <DCC_Define>RELEASE</DCC_Define>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
+    <Version>7.0</Version>
+    <DCC_Define>DEBUG</DCC_Define>
+    <DCC_DcuOutput>..\..\..\dcu</DCC_DcuOutput>
+    <DCC_ObjOutput>..\..\..\dcu</DCC_ObjOutput>
+    <DCC_HppOutput>..\..\..\dcu</DCC_HppOutput>
+    <DCC_ExeOutput>..\..\..\bin</DCC_ExeOutput>
+    <DCC_BplOutput>..\..\..\bin</DCC_BplOutput>
+    <DCC_DcpOutput>..\..\..\dcu</DCC_DcpOutput>
+    <DCC_UnitSearchPath>..\..\..\source\;..\..\..\qdac\</DCC_UnitSearchPath>
+    <DCC_ResourcePath>..\..\..\source\;..\..\..\qdac\</DCC_ResourcePath>
+    <DCC_ObjPath>..\..\..\source\;..\..\..\qdac\</DCC_ObjPath>
+    <DCC_IncludePath>..\..\..\source\;..\..\..\qdac\</DCC_IncludePath>
+  </PropertyGroup>
+  <ProjectExtensions>
+    <Borland.Personality>Delphi.Personality</Borland.Personality>
+    <Borland.ProjectType />
+    <BorlandProject>
+<BorlandProject><Delphi.Personality><Parameters><Parameters Name="UseLauncher">False</Parameters><Parameters Name="LoadAllSymbols">True</Parameters><Parameters Name="LoadUnspecifiedSymbols">False</Parameters></Parameters><VersionInfo><VersionInfo Name="IncludeVerInfo">False</VersionInfo><VersionInfo Name="AutoIncBuild">False</VersionInfo><VersionInfo Name="MajorVer">1</VersionInfo><VersionInfo Name="MinorVer">0</VersionInfo><VersionInfo Name="Release">0</VersionInfo><VersionInfo Name="Build">0</VersionInfo><VersionInfo Name="Debug">False</VersionInfo><VersionInfo Name="PreRelease">False</VersionInfo><VersionInfo Name="Special">False</VersionInfo><VersionInfo Name="Private">False</VersionInfo><VersionInfo Name="DLL">False</VersionInfo><VersionInfo Name="Locale">2052</VersionInfo><VersionInfo Name="CodePage">936</VersionInfo></VersionInfo><VersionInfoKeys><VersionInfoKeys Name="CompanyName"></VersionInfoKeys><VersionInfoKeys Name="FileDescription"></VersionInfoKeys><VersionInfoKeys Name="FileVersion">1.0.0.0</VersionInfoKeys><VersionInfoKeys Name="InternalName"></VersionInfoKeys><VersionInfoKeys Name="LegalCopyright"></VersionInfoKeys><VersionInfoKeys Name="LegalTrademarks"></VersionInfoKeys><VersionInfoKeys Name="OriginalFilename"></VersionInfoKeys><VersionInfoKeys Name="ProductName"></VersionInfoKeys><VersionInfoKeys Name="ProductVersion">1.0.0.0</VersionInfoKeys><VersionInfoKeys Name="Comments"></VersionInfoKeys></VersionInfoKeys><Excluded_Packages>
+      
+      
+      
+      
+      
+      
+      
+      
+      
+      
+      
+      
+      
+      
+      
+      
+      
+      
+      
+      
+      
+      
+      
+      
+      
+      
+      
+      
+      <Excluded_Packages Name="$(BDS)\bin\bcboffice2k100.bpl">CodeGear C++Builder Office 2000 Servers Package</Excluded_Packages>
+      <Excluded_Packages Name="$(BDS)\bin\bcbofficexp100.bpl">CodeGear C++Builder Office XP Servers Package</Excluded_Packages>
+      <Excluded_Packages Name="$(BDS)\bin\dcloffice2k100.bpl">Microsoft Office 2000 Sample Automation Server Wrapper Components</Excluded_Packages>
+      <Excluded_Packages Name="$(BDS)\bin\dclofficexp100.bpl">Microsoft Office XP Sample Automation Server Wrapper Components</Excluded_Packages>
+    </Excluded_Packages><Source><Source Name="MainSource">JSON_DataSet_Serialize_2007.dpr</Source></Source>  
+    
+    
+    
+    
+    
+    
+    <DebugSysEnvironmentVariables>
+      <DebugSysEnvironmentVariables Name="ADSK_3DSMAX_x64_2014">'D:\Program Files\Autodesk\3ds Max 2014\'</DebugSysEnvironmentVariables>
+      <DebugSysEnvironmentVariables Name="ALLUSERSPROFILE">'C:\ProgramData'</DebugSysEnvironmentVariables>
+      <DebugSysEnvironmentVariables Name="ANDROID_HOME">'D:\Program Files\Java\Android\android-sdk'</DebugSysEnvironmentVariables>
+      <DebugSysEnvironmentVariables Name="ANDROID_SDK_HOME">'D:\'</DebugSysEnvironmentVariables>
+      <DebugSysEnvironmentVariables Name="APPDATA">'C:\Users\Administrator\AppData\Roaming'</DebugSysEnvironmentVariables>
+      <DebugSysEnvironmentVariables Name="BDS">'d:\program files (x86)\codegear\rad studio\5.0'</DebugSysEnvironmentVariables>
+      <DebugSysEnvironmentVariables Name="BDSCOMMONDIR">'C:\Users\Public\Documents\RAD Studio\5.0'</DebugSysEnvironmentVariables>
+      <DebugSysEnvironmentVariables Name="BDSPROJECTSDIR">'D:\My Documents\Documents\RAD Studio\Projects'</DebugSysEnvironmentVariables>
+      <DebugSysEnvironmentVariables Name="BDSUSERDIR">'D:\My Documents\Documents\RAD Studio\5.0'</DebugSysEnvironmentVariables>
+      <DebugSysEnvironmentVariables Name="CLASSPATH">'D:\Program Files\Java\jdk1.7.0\lib;D:\Program Files\Java\jdk1.7.0\lib\tools.jar'</DebugSysEnvironmentVariables>
+      <DebugSysEnvironmentVariables Name="CM2014DIR">'C:\Program Files (x86)\Common Files\Autodesk Shared\Materials\'</DebugSysEnvironmentVariables>
+      <DebugSysEnvironmentVariables Name="CommonProgramFiles(x86)">'C:\Program Files (x86)\Common Files'</DebugSysEnvironmentVariables>
+      <DebugSysEnvironmentVariables Name="CommonProgramFiles">'C:\Program Files (x86)\Common Files'</DebugSysEnvironmentVariables>
+      <DebugSysEnvironmentVariables Name="CommonProgramW6432">'C:\Program Files\Common Files'</DebugSysEnvironmentVariables>
+      <DebugSysEnvironmentVariables Name="COMPUTERNAME">'YANGYXD-HOME'</DebugSysEnvironmentVariables>
+      <DebugSysEnvironmentVariables Name="ComSpec">'C:\Windows\system32\cmd.exe'</DebugSysEnvironmentVariables>
+      <DebugSysEnvironmentVariables Name="DELPHI">'d:\program files (x86)\codegear\rad studio\5.0'</DebugSysEnvironmentVariables>
+      <DebugSysEnvironmentVariables Name="DXSDK_DIR">'C:\Program Files (x86)\Microsoft DirectX SDK (March 2009)\'</DebugSysEnvironmentVariables>
+      <DebugSysEnvironmentVariables Name="FP_NO_HOST_CHECK">'NO'</DebugSysEnvironmentVariables>
+      <DebugSysEnvironmentVariables Name="HOMEDRIVE">'C:'</DebugSysEnvironmentVariables>
+      <DebugSysEnvironmentVariables Name="HOMEPATH">'\Users\Administrator'</DebugSysEnvironmentVariables>
+      <DebugSysEnvironmentVariables Name="ILBDIR">'C:\Program Files (x86)\Common Files\Autodesk Shared\Materials\'</DebugSysEnvironmentVariables>
+      <DebugSysEnvironmentVariables Name="ILMDIR">'C:\Program Files (x86)\Common Files\Autodesk Shared\Materials\'</DebugSysEnvironmentVariables>
+      <DebugSysEnvironmentVariables Name="JAVA_HOME">'D:\Program Files\Java\jdk1.7.0'</DebugSysEnvironmentVariables>
+      <DebugSysEnvironmentVariables Name="LOCALAPPDATA">'C:\Users\Administrator\AppData\Local'</DebugSysEnvironmentVariables>
+      <DebugSysEnvironmentVariables Name="LOGONSERVER">'\\YANGYXD-HOME'</DebugSysEnvironmentVariables>
+      <DebugSysEnvironmentVariables Name="NUMBER_OF_PROCESSORS">'8'</DebugSysEnvironmentVariables>
+      <DebugSysEnvironmentVariables Name="OS">'Windows_NT'</DebugSysEnvironmentVariables>
+      <DebugSysEnvironmentVariables Name="Path">'C:\Program Files\Common Files\Microsoft Shared\Windows Live;d:\Program Files (x86)\CodeGear\RAD Studio\5.0\bin;C:\Users\Public\Documents\RAD Studio\5.0\Bpl;C:\Program Files (x86)\NVIDIA Corporation\PhysX\Common;C:\Windows\system32;C:\Windows;C:\Windows\System32\Wbem;C:\Windows\System32\WindowsPowerShell\v1.0\;C:\Program Files (x86)\Common Files\Thunder Network\KanKan\Codecs;C:\Program Files (x86)\Microsoft SQL Server\100\Tools\Binn\;C:\Program Files\Microsoft SQL Server\100\Tools\Binn\;C:\Program Files\Microsoft SQL Server\100\DTS\Binn\;D:\Program Files\Java\jdk1.7.0\bin;D:\Program Files\Java\jdk1.7.0\jre\bin;D:\Program Files\Java\Android\android-sdk\tools;D:\Program Files\Java\Android\android-sdk\;D:\Program Files\Java\Android\android-sdk\platform-tools;C:\Program Files (x86)\Common Files\Autodesk Shared\;C:\Program Files (x86)\backburner 2\;C:\Program Files\Common Files\Autodesk Shared\;C:\Program Files (x86)\Autodesk\Backburner\;C:\Program Files (x86)\Microsoft SQL Server\100\Tools\Binn\VSShell\Common7\IDE\;C:\Program Files (x86)\Microsoft SQL Server\100\DTS\Binn\;C:\Program Files (x86)\Microsoft Visual Studio 9.0\Common7\IDE\PrivateAssemblies\;C:\Users\Public\Documents\Embarcadero\Studio\14.0\Bpl;%CommonProgramFiles%\Microsoft Shared\Windows Live;C:\Users\Public\Documents\RAD Studio\5.0\Bpl'</DebugSysEnvironmentVariables>
+      <DebugSysEnvironmentVariables Name="PATHEXT">'.COM;.EXE;.BAT;.CMD;.VBS;.VBE;.JS;.JSE;.WSF;.WSH;.MSC'</DebugSysEnvironmentVariables>
+      <DebugSysEnvironmentVariables Name="PROCESSOR_ARCHITECTURE">'x86'</DebugSysEnvironmentVariables>
+      <DebugSysEnvironmentVariables Name="PROCESSOR_ARCHITEW6432">'AMD64'</DebugSysEnvironmentVariables>
+      <DebugSysEnvironmentVariables Name="PROCESSOR_IDENTIFIER">'Intel64 Family 6 Model 58 Stepping 9, GenuineIntel'</DebugSysEnvironmentVariables>
+      <DebugSysEnvironmentVariables Name="PROCESSOR_LEVEL">'6'</DebugSysEnvironmentVariables>
+      <DebugSysEnvironmentVariables Name="PROCESSOR_REVISION">'3a09'</DebugSysEnvironmentVariables>
+      <DebugSysEnvironmentVariables Name="ProgramData">'C:\ProgramData'</DebugSysEnvironmentVariables>
+      <DebugSysEnvironmentVariables Name="ProgramFiles(x86)">'C:\Program Files (x86)'</DebugSysEnvironmentVariables>
+      <DebugSysEnvironmentVariables Name="ProgramFiles">'C:\Program Files (x86)'</DebugSysEnvironmentVariables>
+      <DebugSysEnvironmentVariables Name="ProgramW6432">'C:\Program Files'</DebugSysEnvironmentVariables>
+      <DebugSysEnvironmentVariables Name="PSModulePath">'C:\Windows\system32\WindowsPowerShell\v1.0\Modules\'</DebugSysEnvironmentVariables>
+      <DebugSysEnvironmentVariables Name="PUBLIC">'C:\Users\Public'</DebugSysEnvironmentVariables>
+      <DebugSysEnvironmentVariables Name="SESSIONNAME">'Console'</DebugSysEnvironmentVariables>
+      <DebugSysEnvironmentVariables Name="SystemDrive">'C:'</DebugSysEnvironmentVariables>
+      <DebugSysEnvironmentVariables Name="SystemRoot">'C:\Windows'</DebugSysEnvironmentVariables>
+      <DebugSysEnvironmentVariables Name="TEMP">'C:\Users\ADMINI~1\AppData\Local\Temp'</DebugSysEnvironmentVariables>
+      <DebugSysEnvironmentVariables Name="TMP">'C:\Users\ADMINI~1\AppData\Local\Temp'</DebugSysEnvironmentVariables>
+      <DebugSysEnvironmentVariables Name="USERDOMAIN">'YANGYXD-HOME'</DebugSysEnvironmentVariables>
+      <DebugSysEnvironmentVariables Name="USERNAME">'Administrator'</DebugSysEnvironmentVariables>
+      <DebugSysEnvironmentVariables Name="USERPROFILE">'C:\Users\Administrator'</DebugSysEnvironmentVariables>
+      <DebugSysEnvironmentVariables Name="VS100COMNTOOLS">'D:\Program Files\Microsoft Visual Studio 10.0\Common7\Tools\'</DebugSysEnvironmentVariables>
+      <DebugSysEnvironmentVariables Name="windir">'C:\Windows'</DebugSysEnvironmentVariables>
+      <DebugSysEnvironmentVariables Name="windows_tracing_flags">'3'</DebugSysEnvironmentVariables>
+      <DebugSysEnvironmentVariables Name="windows_tracing_logfile">'C:\BVTBin\Tests\installpackage\csilogfile.log'</DebugSysEnvironmentVariables>
+    </DebugSysEnvironmentVariables>
+  </Delphi.Personality></BorlandProject></BorlandProject>
+  </ProjectExtensions>
+  <Import Project="$(MSBuildBinPath)\Borland.Delphi.Targets" />
+  <ItemGroup>
+    <DelphiCompile Include="JSON_DataSet_Serialize_2007.dpr">
+      <MainSource>MainSource</MainSource>
+    </DelphiCompile>
+    <DCCReference Include="Unit1.pas">
+      <Form>Form1</Form>
+    </DCCReference>
+    <None Include="CMOV.inc" />
+  </ItemGroup>
+</Project>
