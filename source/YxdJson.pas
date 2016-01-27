@@ -18,67 +18,72 @@
   更新记录
  --------------------------------------------------------------------
  
+ ver 1.0.16 2016.01.27
+ --------------------------------------------------------------------
+  * 修正 ParseStringByName 函数的一个BUG （RE: 邓意龙）
+  + Delphi 10 支持
+
  ver 1.0.15 2015.09.01
  --------------------------------------------------------------------
   + 加入类似 SuperJSON 的使用方式
- 
+
  ver 1.0.14 2015.07.15
  --------------------------------------------------------------------
-  - 修正 ParseObjectByName 函数的一个BUG （RE: 黑夜杀手）
+  * 修正 ParseObjectByName 函数的一个BUG （RE: 黑夜杀手）
 
  ver 1.0.13 2015.06.09
  --------------------------------------------------------------------
-  - 修正 ParseStringByName 函数的一个BUG （RE: 黑夜杀手）
+  * 修正 ParseStringByName 函数的一个BUG （RE: 黑夜杀手）
 
  ver 1.0.11 2014.12.08
  --------------------------------------------------------------------
-  - 修正ParseNumeric函数在解析负数时，未进行检测造成解析的结果与字符
+  * 修正ParseNumeric函数在解析负数时，未进行检测造成解析的结果与字符
     串表达式结果不一致造成的
 
  ver 1.0.10 2014.11.12
  --------------------------------------------------------------------
-  - 改进JSONBase中SetName方法，改进Put(Key, JSONObject/JSONArray)方
+  * 改进JSONBase中SetName方法，改进Put(Key, JSONObject/JSONArray)方
     法和Destroy过程，实现当JSONBase无父对象时也有效
 
  ver 1.0.9  2014.11.08
  --------------------------------------------------------------------
-  - 修复注释处理的BUG
-  - 修复XE后版本在未启用USERTTI选项时编译不通过问题
-  - 改进FloatToStr函数
-  - 增加属性IsJSONObject、IsJSONArray用于判断JSONBase是JSON对象或数组
+  * 修复注释处理的BUG
+  * 修复XE后版本在未启用USERTTI选项时编译不通过问题
+  * 改进FloatToStr函数
+  + 增加属性IsJSONObject、IsJSONArray用于判断JSONBase是JSON对象或数组
 
  ver 1.0.8  2014.08.05
  --------------------------------------------------------------------
-  - 更改格式化jdtObject的换行问题.
-  - 优化解析多重数组的会产生多于的JsonObject问题。
-  - 支持DataSet序列化与反序列化。启用USEDBRTTI编译开关。
-  - 解决由网友"@[南宁]问道XE、[厦门]中国制造"报告的BUG.
+  * 更改格式化jdtObject的换行问题.
+  * 优化解析多重数组的会产生多于的JsonObject问题。
+  + 支持DataSet序列化与反序列化。启用USEDBRTTI编译开关。
+  * 解决由网友"@[南宁]问道XE、[厦门]中国制造"报告的BUG.
 
  ver 1.0.6  2014.08.01
  --------------------------------------------------------------------
-  - 增加 RTTI 功能支持，启用USERTTI编译选项(需引用YxdRtti单元)。
-  - 跨平台支持，兼容FMX框架，己测试支持Win32, Android。
-  - 增加Copy, CopyIf, FindIf, DeleteIf, ForcePath, ItemByPath等函数。
-  - 支持For..In功能。
-  - 增加类函数ParseObject(TObject)。
-  - 解决getVariant空是返回不是NULL问题（RE: 中国制造）
+  + 增加 RTTI 功能支持，启用USERTTI编译选项(需引用YxdRtti单元)。
+  + 跨平台支持，兼容FMX框架，己测试支持Win32, Android。
+  + 增加Copy, CopyIf, FindIf, DeleteIf, ForcePath, ItemByPath等函数。
+  + 支持For..In功能。
+  + 增加类函数ParseObject(TObject)。
+  * 解决getVariant空是返回不是NULL问题（RE: 中国制造）
 
  ver 1.0.5  2014.07.24
  --------------------------------------------------------------------
-  - 增加 Next 函数，返回父节点中相邻的下一个JSON值
-  - 更改 JSONValue 对数值型的处理方式，解决put整数后不能getFloat的类似
+  + 增加 Next 函数，返回父节点中相邻的下一个JSON值
+  * 更改 JSONValue 对数值型的处理方式，解决put整数后不能getFloat的类似
     问题。
-  - 增加 parseStringByName 函数，快速取出json字符串中指定
+  + 增加 parseStringByName 函数，快速取出json字符串中指定
     key的字符串值
-  - 增加 parseObjectByName 类函数，条件解析json字符串
+  + 增加 parseObjectByName 类函数，条件解析json字符串
 
  ver 1.0.2  2014.07.15
  --------------------------------------------------------------------
-  - 优化代码提升性能 ^_^
+  * 优化代码提升性能 ^_^
 
  ver 1.0.1  2014.07.13
  --------------------------------------------------------------------
-  - XE6支持
+  + XE6支持
 
  --------------------------------------------------------------------
 }
@@ -100,6 +105,14 @@ interface
 {$IFDEF VER185}
 {$DEFINE JSON_SUPPORT}
 {$ENDIF}                         
+
+{$IF RTLVersion>=22}
+{$DEFINE JSON_SUPPORT}
+{$DEFINE JSON_UNICODE}
+{$IFDEF USERTTI}
+{$DEFINE JSON_RTTI}
+{$ENDIF}
+{$ENDIF}
 
 //Delphi XE
 {$IFDEF VER220}
@@ -5473,7 +5486,7 @@ class function JSONObject.parseObjectByName(const text, key: JSONString;
   value: Variant): JSONObject;
 var
   ABuilder: TStringCatHelper;
-  p, p1: PJSONChar;
+  p, p1, pa: PJSONChar;
   c: JSONChar;
   nocmpValue: Boolean;
   i, j: Integer;
@@ -5506,6 +5519,7 @@ begin
   Result := nil;
   if Length(key) = 0 then Exit;
   p := PJSONChar(text);
+  pa := p;
   nocmpValue := VarIsEmpty(value) or VarIsNull(value);
   ABuilder := TStringCatHelper.Create;
   try
@@ -5526,7 +5540,7 @@ begin
         Inc(p1);
         {$IFDEF JSON_UNICODE}SkipSpaceW{$ELSE}SkipSpaceA{$ENDIF}(p1);
         if nocmpValue or CmpValue(p1) then begin
-          i := p1 - p;
+          i := p1 - pa;
           p := p1;
           j := 0;
           if (not nocmpValue) and (p^ = '}') then begin
@@ -5544,6 +5558,7 @@ begin
             Dec(i);
           end;
           if i < 0 then Exit;
+          pa := p;
           while (p1 <> nil) and (p1^ <> #0) do begin
             if p1^ = '{' then
               Inc(j)
