@@ -12,12 +12,16 @@
   YXDJSON基于swish的QJSON修改，感谢swish，感谢QJson
   QJson来自QDAC项目，版权归swish(QQ:109867294)所有
   感谢网友的支持：恢弘、猫叔
-  QDAC官方群：250530692
+  QDAC官方群：250530692 
  
  --------------------------------------------------------------------
   更新记录
  --------------------------------------------------------------------
- 
+
+ ver 1.0.17 2016.02.23
+ --------------------------------------------------------------------
+  * 修正 ParseJsonPair 函数在直接解析数组时的bug
+
  ver 1.0.16 2016.01.27
  --------------------------------------------------------------------
   * 修正 ParseStringByName 函数的一个BUG （RE: 邓意龙）
@@ -669,6 +673,7 @@ type
     procedure Put(const Key: JSONString; const Value: Extended); overload;
     procedure Put(const Key: JSONString; const Value: Double); overload;
     procedure Put(const Key: JSONString; const Value: Variant); overload;
+    procedure Put(const Key: JSONString; const Value: TStream); overload;
     procedure Put(const Key: JSONString; Value: JSONObject); overload;
     procedure Put(const Key: JSONString; Value: JSONArray); overload;
     procedure Put(const Key: JSONString; Value: array of const); overload;
@@ -933,6 +938,7 @@ resourcestring
   SBadUnicodeChar = '无效的Unicode字符:%d';
   {$ENDIF}
   SBadJson = '当前内容不是有效的JSON字符串.';
+  SBadArray = '当前内容不是有效的JSON数组字符串.';
   SCharNeeded = '当前位置应该是 "%s", 而不是 "%s".';
   SBadConvert = '%s 不是一个有效的 %s 类型的值。';
   SBadNumeric = '"%s"不是有效的数值.';
@@ -979,6 +985,7 @@ const
   EParse_BadNameStart       = 6;
   EParse_BadNameEnd         = 7;
   EParse_NameNotFound       = 8;
+  EParse_BadJsonArray       = 9;
 
 {$IFNDEF USEYxdStr}
 //计算当前字符的长度
@@ -3840,6 +3847,7 @@ const
   CharNameEnd:      PJSONChar = '":';
   CharArrayStart:   PJSONChar = '[';
   CharArrayEnd:     PJSONChar = '],';
+  CharArrayEmpty:   PJSONChar = '[] ';
   CharObjectStart:  PJSONChar = '{';
   CharObjectEnd:    PJSONChar = '},';
   CharObjectEmpty:  PJSONChar = '{} ';
@@ -4002,7 +4010,10 @@ const
       ABuilder.Cat(CharNull, 5);
       Exit;
     end else begin
-      ABuilder.Cat(CharObjectEmpty, 3);
+      if ANode.GetIsArray then
+        ABuilder.Cat(CharArrayEmpty, 3)
+      else
+        ABuilder.Cat(CharObjectEmpty, 3);
       Exit;
     end;
 
@@ -4312,6 +4323,12 @@ function JSONBase.ParseJsonPair(ABuilder: TStringCatHelper; var p: PJSONChar): I
 begin
   SkipComment;
   if p^ = '{' then begin
+
+    if GetIsArray then begin
+      Result := EParse_BadJsonArray;
+      Exit;
+    end;
+
     Inc(p);
     {$IFDEF JSON_UNICODE}SkipSpaceW{$ELSE}SkipSpaceA{$ENDIF}(p);
     while (p^<>#0) and (p^ <> '}') do begin
@@ -4348,7 +4365,7 @@ begin
 
   end else if p^ = '[' then begin
     if (not Assigned(FParent)) or (not FParent.GetIsArray) then begin
-      if Length(GetName) = 0 then begin
+      if (Length(GetName) = 0) and (not GetIsArray) then begin
         Result := NewChildArray('unknown').ParseJsonPair(ABuilder, p);
         Exit;
       end;
@@ -4674,7 +4691,9 @@ begin
       EParse_BadNameEnd:
         raise Exception.Create(FormatParseError(ACode,SBadNameEnd, ps,p));
       EParse_NameNotFound:
-        raise Exception.Create(FormatParseError(ACode,SNameNotFound, ps,p))
+        raise Exception.Create(FormatParseError(ACode,SNameNotFound, ps,p));
+      EParse_BadJsonArray:
+        raise Exception.Create(FormatParseError(ACode,SBadArray, ps,p))
       else
         raise Exception.Create(FormatParseError(ACode,SUnknownError, ps,p));
     end;
@@ -5406,10 +5425,12 @@ end;
 function JSONObject.GetChildItem(const Key: JSONString): PJSONValue;
 begin
   Result := GetItem(Key);
-  if (Result = nil) and (Length(Key) > 0) then 
-    Result := Add(Key)
-  else
-    raise Exception.Create(SNameNotFound);
+  if (Result = nil) then begin
+    if (Length(Key) > 0) then
+      Result := Add(Key)
+    else
+      raise Exception.Create(SNameNotFound);
+  end;
 end;
 
 function JSONObject.getVariant(const key: JSONString): Variant;
@@ -5734,6 +5755,42 @@ end;
 procedure JSONObject.Put(const Key: JSONString; Value: array of const);
 begin
   AddChildArray(Key, Value);
+end;
+
+procedure JSONObject.Put(const Key: JSONString; const Value: TStream);
+const
+  BufSize = 4096;
+  B2HConvert: array[0..15] of AnsiChar = ('0', '1', '2', '3', '4', '5', '6',
+    '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F');
+var
+  S: TMemoryStream;
+  pd: PByte;
+  buf: TBytes;
+  i, j: Integer;
+  data: JSONString;
+begin
+  if not Assigned(Value) then Exit;
+  S := TMemoryStream.Create();
+  S.Size := (Value.Size - Value.Position) shl 1;
+  S.Position := 0;
+  pd := S.Memory;
+  SetLength(buf, BufSize);
+  while True do begin
+    i := Value.Read(buf, BufSize);
+    if i > 0 then begin
+      for j := 0 to i - 1 do begin
+        pd^ := Byte(B2HConvert[buf[j] shr 4]);
+        Inc(pd);
+        pd^ := Byte(B2HConvert[buf[j] and $0F]);
+        Inc(pd);
+      end;
+      if i < BufSize then
+        Break;
+    end else
+      Break;
+  end;
+  System.SetString(data, PAnsiChar(S.Memory), pd - PAnsiChar(S.Memory));
+  Add(Key).AsString := data;
 end;
 
 { JSONArray }
