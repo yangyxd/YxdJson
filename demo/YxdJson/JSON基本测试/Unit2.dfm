@@ -22,7 +22,7 @@ object Form2: TForm2
     Top = 208
     Width = 923
     Height = 292
-    ActivePage = TabSheet1
+    ActivePage = TabSheet2
     Anchors = [akLeft, akTop, akRight, akBottom]
     TabOrder = 0
     object TabSheet1: TTabSheet
@@ -81,10 +81,6 @@ object Form2: TForm2
     end
     object TabSheet2: TTabSheet
       Caption = #36755#20986#32467#26524
-      ExplicitLeft = 0
-      ExplicitTop = 0
-      ExplicitWidth = 0
-      ExplicitHeight = 0
       object Memo2: TMemo
         AlignWithMargins = True
         Left = 3
@@ -92,17 +88,23 @@ object Form2: TForm2
         Width = 909
         Height = 258
         Align = alClient
-        ReadOnly = True
         ScrollBars = ssBoth
         TabOrder = 0
+        ExplicitLeft = 51
+        ExplicitTop = 0
+      end
+      object Memo4: TMemo
+        Left = 584
+        Top = -168
+        Width = 185
+        Height = 89
+        Lines.Strings = (
+          'Memo4')
+        TabOrder = 1
       end
     end
     object TabSheet3: TTabSheet
       Caption = #26085#24535
-      ExplicitLeft = 0
-      ExplicitTop = 0
-      ExplicitWidth = 0
-      ExplicitHeight = 0
       object ListBox1: TListBox
         AlignWithMargins = True
         Left = 3
@@ -113,6 +115,15 @@ object Form2: TForm2
         ItemHeight = 13
         PopupMenu = PopupMenu1
         TabOrder = 0
+      end
+      object Memo3: TMemo
+        Left = 576
+        Top = -144
+        Width = 185
+        Height = 89
+        Lines.Strings = (
+          'Memo3')
+        TabOrder = 1
       end
     end
   end

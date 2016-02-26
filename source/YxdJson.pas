@@ -18,6 +18,10 @@
   更新记录
  --------------------------------------------------------------------
 
+ ver 1.0.18 2016.02.26
+ --------------------------------------------------------------------
+  * 修正了 ItemByPath 对特定数组路径的支持问题
+
  ver 1.0.17 2016.02.23
  --------------------------------------------------------------------
   * 修正 ParseJsonPair 函数在直接解析数组时的bug
@@ -116,7 +120,7 @@ interface
 {$IFDEF USERTTI}
 {$DEFINE JSON_RTTI}
 {$ENDIF}
-{$ENDIF}
+{$IFEND}
 
 //Delphi XE
 {$IFDEF VER220}
@@ -4104,25 +4108,30 @@ begin
             Break;
           end else
             Dec(l);
-        until l = 0;
+        until l < 0;
         if l > 0 then begin
           AName := StrDupX(pn, l);
           I := AParent.IndexOf(AName);
           if (I > -1) then begin
-            Result := AParent.FItems.items[I]; 
+            Result := AParent.FItems.items[I];
             if (Assigned(Result.AsJsonArray)) and (AIndex >= 0) and (AIndex < Result.FObject.Count) then begin
               Result := Result.FObject.FItems[AIndex];
               AParent := Result.FObject;
-            end else 
+            end else
               Break;
-          end else 
+          end else
             Break;
-        end else 
+        end else if l = 0 then begin
+          if (AIndex > -1) and (AIndex < AParent.Count) then begin
+            Result := AParent.Items[AIndex];
+            AParent := Result.FObject;
+          end;
+        end else
           Break;
       end else begin
         I := AParent.IndexOf(AName);
         if (I > -1) then begin
-          Result := AParent.FItems.Items[I]; 
+          Result := AParent.FItems.Items[I];
           AParent := Result.FObject;
         end else begin
           Result := nil;

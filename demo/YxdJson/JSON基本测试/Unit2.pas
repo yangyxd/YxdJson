@@ -39,6 +39,8 @@ type
     Button16: TButton;
     Button17: TButton;
     Button18: TButton;
+    Memo3: TMemo;
+    Memo4: TMemo;
     procedure Button1Click(Sender: TObject);
     procedure Button3Click(Sender: TObject);
     procedure Button2Click(Sender: TObject);
@@ -113,15 +115,16 @@ end;
 
 procedure TForm2.Button12Click(Sender: TObject);
 var
-  json: JSONObject;
+  json: JSONArray;
   ja: JSONArray;
   i, allowAccess: Integer;
 begin
-  json := JSONObject.Create;
+  json := JSONArray.Create;
   try
     json.Parse(Memo2.Text);
+    ShowMessage(json.ItemByPath('[0].[0].name').AsString);
     //ja := json.GetJsonObject('data').GetJsonArray('album');
-    ja := json.ItemByPath('data.album').AsJsonArray;
+    ja := json.ItemByPath('[0].[0]').AsJsonArray;
     for I := 0 to ja.Count - 1 do
       allowAccess := ja.GetJsonObject(i).GetInt('allowAccess');
   finally
@@ -152,6 +155,8 @@ var
 begin
   json := JSONObject.Create;
   json.AddChildObject('test');
+  ShowMessage(json.ToString());
+  json.Parse(json.ToString());
   ShowMessage(json.ToString());
   FreeAndNil(json);
 end;
