@@ -43,13 +43,13 @@ interface
 
 {$IF RTLVersion>=26}
 {$DEFINE USE_UNICODE}
-{$IFEND}
+{$ENDIF}
 
 uses
   {$IFDEF USEYxdStr}YxdStr, {$ENDIF}
   {$IFDEF MSWINDOWS}Windows, {$ENDIF}
   {$IFDEF USE_UNICODE}Generics.Collections, Rtti, {$ENDIF}
-  {$IFDEF USE_UNICODE}Soap.EncdDecd, {$ELSE}Base64, {$ENDIF}
+  {$IFDEF USE_UNICODE}Soap.EncdDecd, System.NetEncoding, {$ELSE}Base64, {$ENDIF}
   {$IFDEF USEDataSet}DB, DBClient, {$ENDIF}
   {$IFDEF USEJsonSerialize}YxdJson, {$ENDIF}   
   SysUtils, Classes, Variants, TypInfo;
@@ -304,7 +304,7 @@ var
     end;
     case DataType of
       ftDate, ftTime, ftDateTime, ftTimeStamp{$IFDEF USE_UNICODE}, ftTimeStampOffset{$ENDIF}:
-        Field.Value := Item.AsDateTime;
+        Field.Value := Item.TryAsDatetime;
       ftBlob, ftGraphic, ftMemo, ftTypedBinary:
         begin
           case GetBlodValue(Field, Item, Buf) of
@@ -329,7 +329,7 @@ var
         jdtFloat:
           Field.Value := Item.AsFloat;
         jdtDateTime:
-          Field.Value := Item.AsDateTime;
+          Field.Value := Item.TryAsDatetime;
         jdtString:
           begin
             case GetBlodValue(Field, Item, Buf) of
@@ -628,7 +628,7 @@ class procedure TYxdSerialize.readValue(aIn: JSONBase; aDest: Pointer;
                 (AFieldItem.FieldType.Handle = TypeInfo(TTime)) or
                 (AFieldItem.FieldType.Handle = TypeInfo(TDate))
                  then
-                 AFieldItem.SetValue(ABaseAddr, AChild.AsDateTime)
+                 AFieldItem.SetValue(ABaseAddr, AChild.TryAsDatetime)
               else
                 AFieldItem.SetValue(ABaseAddr, AChild.AsFloat);
             tkInt64:
@@ -1120,7 +1120,7 @@ begin
     jdtFloat:
       Result := aIn.AsFloat;
     jdtDateTime:
-      Result := aIn.AsDateTime;
+      Result := aIn.TryAsDatetime;
     jdtBoolean:
       Result := aIn.AsBoolean;
     jdtObject:

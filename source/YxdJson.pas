@@ -12,86 +12,73 @@
   YXDJSON基于swish的QJSON修改，感谢swish，感谢QJson
   QJson来自QDAC项目，版权归swish(QQ:109867294)所有
   感谢网友的支持：恢弘、猫叔
-  QDAC官方群：250530692 
+  QDAC官方群：250530692
  
  --------------------------------------------------------------------
   更新记录
  --------------------------------------------------------------------
-
- ver 1.0.18 2016.02.26
- --------------------------------------------------------------------
-  * 修正了 ItemByPath 对特定数组路径的支持问题
-
- ver 1.0.17 2016.02.23
- --------------------------------------------------------------------
-  * 修正 ParseJsonPair 函数在直接解析数组时的bug
-
- ver 1.0.16 2016.01.27
- --------------------------------------------------------------------
-  * 修正 ParseStringByName 函数的一个BUG （RE: 邓意龙）
-  + Delphi 10 支持
-
+ 
  ver 1.0.15 2015.09.01
  --------------------------------------------------------------------
   + 加入类似 SuperJSON 的使用方式
-
+ 
  ver 1.0.14 2015.07.15
  --------------------------------------------------------------------
-  * 修正 ParseObjectByName 函数的一个BUG （RE: 黑夜杀手）
+  - 修正 ParseObjectByName 函数的一个BUG （RE: 黑夜杀手）
 
  ver 1.0.13 2015.06.09
  --------------------------------------------------------------------
-  * 修正 ParseStringByName 函数的一个BUG （RE: 黑夜杀手）
+  - 修正 ParseStringByName 函数的一个BUG （RE: 黑夜杀手）
 
  ver 1.0.11 2014.12.08
  --------------------------------------------------------------------
-  * 修正ParseNumeric函数在解析负数时，未进行检测造成解析的结果与字符
+  - 修正ParseNumeric函数在解析负数时，未进行检测造成解析的结果与字符
     串表达式结果不一致造成的
 
  ver 1.0.10 2014.11.12
  --------------------------------------------------------------------
-  * 改进JSONBase中SetName方法，改进Put(Key, JSONObject/JSONArray)方
+  - 改进JSONBase中SetName方法，改进Put(Key, JSONObject/JSONArray)方
     法和Destroy过程，实现当JSONBase无父对象时也有效
 
  ver 1.0.9  2014.11.08
  --------------------------------------------------------------------
-  * 修复注释处理的BUG
-  * 修复XE后版本在未启用USERTTI选项时编译不通过问题
-  * 改进FloatToStr函数
-  + 增加属性IsJSONObject、IsJSONArray用于判断JSONBase是JSON对象或数组
+  - 修复注释处理的BUG
+  - 修复XE后版本在未启用USERTTI选项时编译不通过问题
+  - 改进FloatToStr函数
+  - 增加属性IsJSONObject、IsJSONArray用于判断JSONBase是JSON对象或数组
 
  ver 1.0.8  2014.08.05
  --------------------------------------------------------------------
-  * 更改格式化jdtObject的换行问题.
-  * 优化解析多重数组的会产生多于的JsonObject问题。
-  + 支持DataSet序列化与反序列化。启用USEDBRTTI编译开关。
-  * 解决由网友"@[南宁]问道XE、[厦门]中国制造"报告的BUG.
+  - 更改格式化jdtObject的换行问题.
+  - 优化解析多重数组的会产生多于的JsonObject问题。
+  - 支持DataSet序列化与反序列化。启用USEDBRTTI编译开关。
+  - 解决由网友"@[南宁]问道XE、[厦门]中国制造"报告的BUG.
 
  ver 1.0.6  2014.08.01
  --------------------------------------------------------------------
-  + 增加 RTTI 功能支持，启用USERTTI编译选项(需引用YxdRtti单元)。
-  + 跨平台支持，兼容FMX框架，己测试支持Win32, Android。
-  + 增加Copy, CopyIf, FindIf, DeleteIf, ForcePath, ItemByPath等函数。
-  + 支持For..In功能。
-  + 增加类函数ParseObject(TObject)。
-  * 解决getVariant空是返回不是NULL问题（RE: 中国制造）
+  - 增加 RTTI 功能支持，启用USERTTI编译选项(需引用YxdRtti单元)。
+  - 跨平台支持，兼容FMX框架，己测试支持Win32, Android。
+  - 增加Copy, CopyIf, FindIf, DeleteIf, ForcePath, ItemByPath等函数。
+  - 支持For..In功能。
+  - 增加类函数ParseObject(TObject)。
+  - 解决getVariant空是返回不是NULL问题（RE: 中国制造）
 
  ver 1.0.5  2014.07.24
  --------------------------------------------------------------------
-  + 增加 Next 函数，返回父节点中相邻的下一个JSON值
-  * 更改 JSONValue 对数值型的处理方式，解决put整数后不能getFloat的类似
+  - 增加 Next 函数，返回父节点中相邻的下一个JSON值
+  - 更改 JSONValue 对数值型的处理方式，解决put整数后不能getFloat的类似
     问题。
-  + 增加 parseStringByName 函数，快速取出json字符串中指定
+  - 增加 parseStringByName 函数，快速取出json字符串中指定
     key的字符串值
-  + 增加 parseObjectByName 类函数，条件解析json字符串
+  - 增加 parseObjectByName 类函数，条件解析json字符串
 
  ver 1.0.2  2014.07.15
  --------------------------------------------------------------------
-  * 优化代码提升性能 ^_^
+  - 优化代码提升性能 ^_^
 
  ver 1.0.1  2014.07.13
  --------------------------------------------------------------------
-  + XE6支持
+  - XE6支持
 
  --------------------------------------------------------------------
 }
@@ -103,7 +90,7 @@ interface
 (* 功能可选项条件编译 *)
 {$DEFINE USEYxdStr}     // 是否使用YxdStr单元
 {$DEFINE USERTTI}       // 是否使用RTTI功能
-{$DEFINE USERegEx}      // 是否使用正则表达式搜索功能，D2010之前版本需要引用相关单元
+{.$DEFINE USERegEx}      // 是否使用正则表达式搜索功能，D2010之前版本需要引用相关单元
 {$IFDEF USERTTI}
 {$DEFINE USEDBRTTI}     // 是否使用DataSet序列化功能，必须先启用USERTTI
 {$ENDIF}
@@ -114,14 +101,6 @@ interface
 {$DEFINE JSON_SUPPORT}
 {$ENDIF}                         
 
-{$IF RTLVersion>=22}
-{$DEFINE JSON_SUPPORT}
-{$DEFINE JSON_UNICODE}
-{$IFDEF USERTTI}
-{$DEFINE JSON_RTTI}
-{$ENDIF}
-{$IFEND}
-
 //Delphi XE
 {$IFDEF VER220}
 {$DEFINE JSON_SUPPORT}
@@ -131,14 +110,15 @@ interface
 {$ENDIF}
 {$ENDIF}
 
-//Rad Studio XE6
-{$IFDEF VER270}
-{$DEFINE JSON_SUPPORT}
-{$DEFINE JSON_UNICODE}
-{$IFDEF USERTTI}
-{$DEFINE JSON_RTTI}
-{$DEFINE JSON_RTTI_NAMEFIELD}
-{$ENDIF}
+{$IFNDEF JSON_SUPPORT}
+  {$IF CompilerVersion > 22}
+    {$DEFINE JSON_SUPPORT}
+    {$DEFINE JSON_UNICODE}
+    {$IFDEF USERTTI}
+      {$DEFINE JSON_RTTI}
+      {$DEFINE JSON_RTTI_NAMEFIELD}
+    {$ENDIF}
+  {$ENDIF}
 {$ENDIF}
 
 {$IFNDEF JSON_SUPPORT}
@@ -309,6 +289,8 @@ type
     function ToObjectValue: TValue;
     {$ENDIF}
     procedure CopyValue(ASource: PJSONValue); inline;
+
+    function TryAsDatetime(const DefaultValue: TDateTime = 0): TDateTime;
 
     property AsBoolean: Boolean read GetAsBoolean write SetAsBoolean;
     property AsByte: Byte read GetAsByte write SetAsByte;
@@ -605,25 +587,15 @@ type
     {$ENDIF}
     {$ENDIF}
     {$IFDEF JSON_RTTI}
-    /// <summary>
-    /// 将当前json数据设置到AInstance指定的来源地址和类型数据中
-    /// </summary>
+    // 将当前json数据设置到AInstance指定的来源地址和类型数据中
     procedure ToObjectValue(AInstance: TValue); overload;
-    /// <summary>
-    /// 将当前json数据转换为TValue类型的值
-    /// </summary>
+    // 将当前json数据转换为TValue类型的值
     function ToObjectValue(): TValue; overload;
-    /// <summary>
-    /// 将当前json数据设置到指定的记录实例中
-    /// </summary>
+    // 将当前json数据设置到指定的记录实例中
     procedure ToRecord<T>(out AInstance: T);
-    /// <summary>
-    /// 将指定的RTTI实例加入json中
-    /// </summary>
+    // 将指定的RTTI实例加入json中
     procedure PutObjectValue(const Key: JSONString; AInstance: TValue); overload;
-    /// <summary>
-    /// 将指定的记录实例加入json中
-    /// </summary>
+    // 将指定的记录实例加入json中
     procedure PutRecord<T>(const Key: JSONString; const ASource: T);
     /// <summary>使用当前Json对象参数调用指定对象的相应函数</summary>
     /// <param name="AInstance">函数所隶属的对象实例</param>
@@ -632,9 +604,7 @@ type
     function Invoke(AInstance: TValue): TValue;
     {$ENDIF}
 
-    /// <summary>
-    /// 添加JSON字符串，可以自动解析
-    /// </summary>
+    // 添加JSON字符串，可以自动解析
     procedure PutJSON(const Key, Value: JSONString; AType: JsonDataType = jdtUnknown);
 
     //父结点
@@ -677,7 +647,6 @@ type
     procedure Put(const Key: JSONString; const Value: Extended); overload;
     procedure Put(const Key: JSONString; const Value: Double); overload;
     procedure Put(const Key: JSONString; const Value: Variant); overload;
-    procedure Put(const Key: JSONString; const Value: TStream); overload;
     procedure Put(const Key: JSONString; Value: JSONObject); overload;
     procedure Put(const Key: JSONString; Value: JSONArray); overload;
     procedure Put(const Key: JSONString; Value: array of const); overload;
@@ -728,7 +697,7 @@ type
     procedure SetInt64(const Key: JSONString; const Value: Int64);
     procedure SetInt(const Key: JSONString; const Value: Integer);
     procedure SetWord(const Key: JSONString; const Value: Word);
-    procedure SetDWORD(const Key: JSONString; const Value: DWORD);
+    procedure SetDWORD(const Key: JSONString; const Value: Cardinal);
     procedure SetJsonArray(const Key: JSONString; const Value: JSONArray);
     procedure SetJsonObject(const Key: JSONString; const Value: JSONObject);
     procedure SetString(const Key, Value: JSONString);
@@ -772,18 +741,12 @@ type
     procedure Add(Value: JSONObject); overload;
     procedure Add(Value: JSONArray); overload;
     procedure AddDateTime(Value: TDateTime);
-    /// <summary>
-    /// 添加JSON字符串，可以自动解析
-    /// </summary>
+    // 添加JSON字符串，可以自动解析
     procedure AddJSON(const Value: JSONString; AType: JsonDataType = jdtUnknown); overload;
     {$IFDEF JSON_RTTI}
-    /// <summary>
-    /// 将指定的对象实例加入json中
-    /// </summary>
+    // 将指定的对象实例加入json中
     procedure PutObject(ASource: TObject);
-    /// <summary>
-    /// 将指定的记录实例加入json中
-    /// </summary>
+    // 将指定的记录实例加入json中
     procedure PutRecord<T>(const ASource: T);
     {$ENDIF}
 
@@ -814,7 +777,7 @@ type
     procedure SetDouble(Index: Integer; const Value: Double);
     procedure SetInt(Index: Integer; const Value: Integer);
     procedure SetWord(Index: Integer; const Value: Word);
-    procedure SetDWORD(Index: Integer; const Value: DWORD);
+    procedure SetDWORD(Index: Integer; const Value: Cardinal);
     procedure SetInt64(Index: Integer; const Value: Int64);
     procedure SetDateTime(Index: Integer; const Value: TDateTime);
     procedure SetJsonArray(Index: Integer; const Value: JSONArray);
@@ -942,7 +905,6 @@ resourcestring
   SBadUnicodeChar = '无效的Unicode字符:%d';
   {$ENDIF}
   SBadJson = '当前内容不是有效的JSON字符串.';
-  SBadArray = '当前内容不是有效的JSON数组字符串.';
   SCharNeeded = '当前位置应该是 "%s", 而不是 "%s".';
   SBadConvert = '%s 不是一个有效的 %s 类型的值。';
   SBadNumeric = '"%s"不是有效的数值.';
@@ -989,7 +951,6 @@ const
   EParse_BadNameStart       = 6;
   EParse_BadNameEnd         = 7;
   EParse_NameNotFound       = 8;
-  EParse_BadJsonArray       = 9;
 
 {$IFNDEF USEYxdStr}
 //计算当前字符的长度
@@ -3182,11 +3143,11 @@ procedure JSONValue.SetAsVariant(const Value: Variant);
     P: JSONBase;
   begin
     if Length(FValue) <> 0 then SetLength(FValue, 0);
-    if (Assigned(FObject)) and (not FObject.GetIsArray) then begin 
+    if (Assigned(FObject)) and (not FObject.GetIsArray) then begin
       P := FObject.FParent;
-      FreeAndNil(FObject);  
-    end else 
-      P := nil;     
+      FreeAndNil(FObject);
+    end else
+      P := nil;
     if not Assigned(FObject) then begin
       FObject := JSONArray.Create;  
       FObject.FParent := P; 
@@ -3281,6 +3242,18 @@ begin
     jdtNull, jdtUnknown:
       Result := 'null';
   end;
+end;
+
+function JSONValue.TryAsDatetime(const DefaultValue: TDateTime): TDateTime;
+begin
+  if (FType <> jdtNull) and (Length(FValue) > 0) then begin
+    try
+      Result := AsDateTime
+    except
+      Result := DefaultValue;
+    end;
+  end else
+    Result := DefaultValue;
 end;
 
 function JSONValue.ToString: JSONString;
@@ -3851,7 +3824,6 @@ const
   CharNameEnd:      PJSONChar = '":';
   CharArrayStart:   PJSONChar = '[';
   CharArrayEnd:     PJSONChar = '],';
-  CharArrayEmpty:   PJSONChar = '[] ';
   CharObjectStart:  PJSONChar = '{';
   CharObjectEnd:    PJSONChar = '},';
   CharObjectEmpty:  PJSONChar = '{} ';
@@ -4014,10 +3986,7 @@ const
       ABuilder.Cat(CharNull, 5);
       Exit;
     end else begin
-      if ANode.GetIsArray then
-        ABuilder.Cat(CharArrayEmpty, 3)
-      else
-        ABuilder.Cat(CharObjectEmpty, 3);
+      ABuilder.Cat(CharObjectEmpty, 3);
       Exit;
     end;
 
@@ -4108,30 +4077,25 @@ begin
             Break;
           end else
             Dec(l);
-        until l < 0;
+        until l = 0;
         if l > 0 then begin
           AName := StrDupX(pn, l);
           I := AParent.IndexOf(AName);
           if (I > -1) then begin
-            Result := AParent.FItems.items[I];
+            Result := AParent.FItems.items[I]; 
             if (Assigned(Result.AsJsonArray)) and (AIndex >= 0) and (AIndex < Result.FObject.Count) then begin
               Result := Result.FObject.FItems[AIndex];
               AParent := Result.FObject;
-            end else
+            end else 
               Break;
-          end else
+          end else 
             Break;
-        end else if l = 0 then begin
-          if (AIndex > -1) and (AIndex < AParent.Count) then begin
-            Result := AParent.Items[AIndex];
-            AParent := Result.FObject;
-          end;
-        end else
+        end else 
           Break;
       end else begin
         I := AParent.IndexOf(AName);
         if (I > -1) then begin
-          Result := AParent.FItems.Items[I];
+          Result := AParent.FItems.Items[I]; 
           AParent := Result.FObject;
         end else begin
           Result := nil;
@@ -4332,12 +4296,6 @@ function JSONBase.ParseJsonPair(ABuilder: TStringCatHelper; var p: PJSONChar): I
 begin
   SkipComment;
   if p^ = '{' then begin
-
-    if GetIsArray then begin
-      Result := EParse_BadJsonArray;
-      Exit;
-    end;
-
     Inc(p);
     {$IFDEF JSON_UNICODE}SkipSpaceW{$ELSE}SkipSpaceA{$ENDIF}(p);
     while (p^<>#0) and (p^ <> '}') do begin
@@ -4374,7 +4332,7 @@ begin
 
   end else if p^ = '[' then begin
     if (not Assigned(FParent)) or (not FParent.GetIsArray) then begin
-      if (Length(GetName) = 0) and (not GetIsArray) then begin
+      if Length(GetName) = 0 then begin
         Result := NewChildArray('unknown').ParseJsonPair(ABuilder, p);
         Exit;
       end;
@@ -4700,9 +4658,7 @@ begin
       EParse_BadNameEnd:
         raise Exception.Create(FormatParseError(ACode,SBadNameEnd, ps,p));
       EParse_NameNotFound:
-        raise Exception.Create(FormatParseError(ACode,SNameNotFound, ps,p));
-      EParse_BadJsonArray:
-        raise Exception.Create(FormatParseError(ACode,SBadArray, ps,p))
+        raise Exception.Create(FormatParseError(ACode,SNameNotFound, ps,p))
       else
         raise Exception.Create(FormatParseError(ACode,SUnknownError, ps,p));
     end;
@@ -5434,12 +5390,10 @@ end;
 function JSONObject.GetChildItem(const Key: JSONString): PJSONValue;
 begin
   Result := GetItem(Key);
-  if (Result = nil) then begin
-    if (Length(Key) > 0) then
-      Result := Add(Key)
-    else
-      raise Exception.Create(SNameNotFound);
-  end;
+  if (Result = nil) and (Length(Key) > 0) then 
+    Result := Add(Key)
+  else
+    raise Exception.Create(SNameNotFound);
 end;
 
 function JSONObject.getVariant(const key: JSONString): Variant;
@@ -5516,7 +5470,7 @@ class function JSONObject.parseObjectByName(const text, key: JSONString;
   value: Variant): JSONObject;
 var
   ABuilder: TStringCatHelper;
-  p, p1, pa: PJSONChar;
+  p, p1: PJSONChar;
   c: JSONChar;
   nocmpValue: Boolean;
   i, j: Integer;
@@ -5549,7 +5503,6 @@ begin
   Result := nil;
   if Length(key) = 0 then Exit;
   p := PJSONChar(text);
-  pa := p;
   nocmpValue := VarIsEmpty(value) or VarIsNull(value);
   ABuilder := TStringCatHelper.Create;
   try
@@ -5570,7 +5523,7 @@ begin
         Inc(p1);
         {$IFDEF JSON_UNICODE}SkipSpaceW{$ELSE}SkipSpaceA{$ENDIF}(p1);
         if nocmpValue or CmpValue(p1) then begin
-          i := p1 - pa;
+          i := p1 - p;
           p := p1;
           j := 0;
           if (not nocmpValue) and (p^ = '}') then begin
@@ -5588,7 +5541,6 @@ begin
             Dec(i);
           end;
           if i < 0 then Exit;
-          pa := p;
           while (p1 <> nil) and (p1^ <> #0) do begin
             if p1^ = '{' then
               Inc(j)
@@ -5712,7 +5664,7 @@ begin
     GetChildItem(Key).AsDouble := Value;
 end;
 
-procedure JSONObject.SetDWORD(const Key: JSONString; const Value: DWORD);
+procedure JSONObject.SetDWORD(const Key: JSONString; const Value: Cardinal);
 begin
   if Length(Key) > 0 then   
     GetChildItem(Key).AsInteger := Value;
@@ -5764,42 +5716,6 @@ end;
 procedure JSONObject.Put(const Key: JSONString; Value: array of const);
 begin
   AddChildArray(Key, Value);
-end;
-
-procedure JSONObject.Put(const Key: JSONString; const Value: TStream);
-const
-  BufSize = 4096;
-  B2HConvert: array[0..15] of AnsiChar = ('0', '1', '2', '3', '4', '5', '6',
-    '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F');
-var
-  S: TMemoryStream;
-  pd: PByte;
-  buf: TBytes;
-  i, j: Integer;
-  data: JSONString;
-begin
-  if not Assigned(Value) then Exit;
-  S := TMemoryStream.Create();
-  S.Size := (Value.Size - Value.Position) shl 1;
-  S.Position := 0;
-  pd := S.Memory;
-  SetLength(buf, BufSize);
-  while True do begin
-    i := Value.Read(buf, BufSize);
-    if i > 0 then begin
-      for j := 0 to i - 1 do begin
-        pd^ := Byte(B2HConvert[buf[j] shr 4]);
-        Inc(pd);
-        pd^ := Byte(B2HConvert[buf[j] and $0F]);
-        Inc(pd);
-      end;
-      if i < BufSize then
-        Break;
-    end else
-      Break;
-  end;
-  System.SetString(data, PAnsiChar(S.Memory), pd - PAnsiChar(S.Memory));
-  Add(Key).AsString := data;
 end;
 
 { JSONArray }
@@ -5981,7 +5897,7 @@ var
   Item: PJSONValue;
 begin
   Item := FItems[index];
-  if Item <> nil then
+  if (Item <> nil) and (Item.FType <> jdtNull) and (Length(Item.FValue) > 0) then
     Result := Item.AsDateTime
   else
     Result := 0;
@@ -6168,7 +6084,7 @@ begin
     FItems[index].AsDouble := Value;
 end;
 
-procedure JSONArray.SetDWORD(Index: Integer; const Value: DWORD);
+procedure JSONArray.SetDWORD(Index: Integer; const Value: Cardinal);
 begin
   if (Index < 0) or (Index >= Count) then
     Add(Value)
@@ -6228,7 +6144,7 @@ procedure JSONArray.SetWord(Index: Integer; const Value: Word);
 begin
   if (Index < 0) or (Index >= Count) then
     Add(Value)
-  else 
+  else
     FItems[index].AsWord := Value;
 end;
 

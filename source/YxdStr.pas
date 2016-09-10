@@ -18,20 +18,21 @@ interface
 //Delphi XE
 {$IF (RTLVersion>=26)}
 {$DEFINE USE_UNICODE}
-{$IFEND}
+{$ENDIF}
 
 //ÊÇ·ñÊ¹ÓÃInline
 {$DEFINE INLINE}
 
 {$IF (RTLVersion>=26) and (not Defined(NEXTGEN))}
 {$DEFINE ANSISTRINGS}
-{$IFEND}
+{$ENDIF}
 
 uses
   {$IFNDEF UNICODE}Windows, {$ELSE} {$IFDEF MSWINDOWS}Windows, {$ENDIF}{$ENDIF}
   {$IFDEF ANSISTRINGS}AnsiStrings, {$ENDIF}
   {$IFDEF POSIX}Posix.String_, {$ENDIF}
   {$IFDEF USE_URLFUNC}StrUtils, Math, {$ENDIF}
+  {$IFDEF NEXTGEN}System.NetEncoding, {$ENDIF}
   SysUtils, SysConst, Classes, Variants;
 
 type
@@ -114,6 +115,7 @@ type
     function Back(ALen: Integer): TStringCatHelper;
     function BackIf(const s: PChar): TStringCatHelper;
     procedure Reset;
+    procedure Clear;
     property Value: string read GetValue;
     property Chars[Index: Integer]: Char read GetChars;
     property Start: PChar read FStart;
@@ -1008,7 +1010,6 @@ const
     ,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1
     ,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1
   );
-
   L_BYTE: array[0..255] of Smallint =
   (
    -1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1
@@ -1028,6 +1029,11 @@ const
   ,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1
   ,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1
   );
+const
+  CA_Zero: AnsiChar = {$IFDEF NEXTGEN}0{$ELSE}#0{$ENDIF};
+  CA_ADD: AnsiChar = {$IFDEF NEXTGEN}Ord('+'){$ELSE}'+'{$ENDIF};
+  CA_Space: AnsiChar = {$IFDEF NEXTGEN}32{$ELSE}#32{$ENDIF};
+  CA_PerCent: AnsiChar = {$IFDEF NEXTGEN}Ord('%'){$ELSE}'%'{$ENDIF};
 var
   Sp, Rp: PAnsichar;
   HB, LB: SmallInt;
@@ -1038,24 +1044,24 @@ begin
   Sp := Src;
   Rp := OutBuf;
   LB := -1;
-  while Sp^ <> #0 do begin
+  while Sp^ <> CA_Zero do begin
     case Sp^ of
-      '+': Rp^ := #32;
-      '%': begin
+      {$IFDEF NEXTGEN}Ord('+'){$ELSE}'+'{$ENDIF}: Rp^ := CA_Space;
+      {$IFDEF NEXTGEN}Ord('%'){$ELSE}'%'{$ENDIF}: begin
              // Look for an escaped % (%%) or %<hex> encoded character
              Inc(Sp);
-             if Sp^ = '%' then
-               Rp^ := '%'
+             if Sp^ = CA_PerCent then
+               Rp^ := CA_PerCent
              else begin
                HB := H_BYTE[Byte(Sp^)];
-               if HB <> 0 then               
-                LB := L_BYTE[Byte((Sp+1)^)];
+               if HB <> 0 then
+                LB := L_BYTE[Byte(PCharA(IntPtr(Sp)+1)^)];
                if (HB <> -1) and (LB <> -1) then begin
                  Rp^ := AnsiChar(HB + LB);
                  Inc(Sp);
                end else begin
                  if RaiseError then
-                   raise Exception.Create(Format(sErrorDecodingURLText, [Sp - Src]))
+                   raise Exception.Create(Format(sErrorDecodingURLText, [IntPtr(Sp) - IntPtr(Src)]))
                  else
                    Exit;
                end;
@@ -1067,27 +1073,35 @@ begin
     Inc(Rp);
     Inc(Sp);
   end;
-  Result := Rp - OutBuf;
+  Result := IntPtr(Rp) - IntPtr(OutBuf);
 end;
 
 function UrlDecode(const AStr: StringA; RaiseError: Boolean): StringA;
 var
   I: Integer;
 begin
-  if Length(AStr) > 0 then begin
+  if {$IFDEF NEXTGEN}AStr.Length{$ELSE}Length(AStr){$ENDIF} > 0 then begin
+    {$IFDEF NEXTGEN}
+    Result.SetLength(AStr.Length);
+    {$ELSE}
     SetLength(Result, Length(AStr));
-    I := UrlDecode(Pointer(AStr), Pointer(Result), RaiseError);
+    {$ENDIF}
+    I := UrlDecode(PAnsiChar(AStr), PAnsiChar(Result), RaiseError);
     if I = -1 then
       Result := ''
     else if I <> Length(Result) then
-      SetLength(Result, I);   
+      {$IFDEF NEXTGEN}
+      Result.SetLength(I);
+      {$ELSE}
+      SetLength(Result, I);
+      {$ENDIF}
   end else
     Result := '';
 end;
 
 function UrlEncodeA(const AStr: PCharA; OutBuf: PCharA): Integer;
 const
-  HTTP_CONVERT: array[0..255] of PCharA = (
+  HTTP_CONVERT: array[0..255] of {$IFDEF NEXTGEN}string{$ELSE}PCharA{$ENDIF} = (
     ' %00#','%01#','%02#','%03#','%04#','%05#','%06#','%07#'
     ,'%08#','%09#','%0A#','%0B#','%0C#','%0D#','%0E#','%0F#'
     ,'%10#','%11#','%12#','%13#','%14#','%15#','%16#','%17#'
@@ -1126,12 +1140,16 @@ var
 begin
   Sp := AStr;
   Rp := OutBuf;
-  while Sp^ <> #0 do begin
-    if Sp^ = ' ' then
-      Rp^ := '+'
+  while Sp^ <> {$IFDEF NEXTGEN}0{$ELSE}#0{$ENDIF} do begin
+    if Sp^ = {$IFDEF NEXTGEN}Ord(' '){$ELSE}' '{$ENDIF} then
+      Rp^ := {$IFDEF NEXTGEN}Ord('+'){$ELSE}'+'{$ENDIF}
     else begin
+      {$IFDEF NEXTGEN}
+      P := PCharA(StringA(HTTP_CONVERT[Ord(Sp^)]));
+      {$ELSE}
       P := HTTP_CONVERT[Ord(Sp^)];
-      if P^ = #0 then
+      {$ENDIF}
+      if P^ = {$IFDEF NEXTGEN}0{$ELSE}#0{$ENDIF} then
         Rp^ := Sp^
       else begin
         PInteger(Rp)^ := PInteger(P)^;
@@ -1141,10 +1159,19 @@ begin
     Inc(Rp);
     Inc(Sp);
   end;
-  Result := Rp - OutBuf;
+  Result := IntPtr(Rp) - IntPtr(OutBuf);
 end;
 
 function UrlEncodeW(const AStr: PCharW; OutBuf: PCharW): Integer;
+{$IFDEF NEXTGEN}
+var
+  Tmp: StringW;
+begin
+  Tmp := TNetEncoding.URL.Encode(AStr);
+  Result := Length(Tmp);
+  if Result > 0 then
+    Move(PCharW(Tmp)^, OutBuf, Result);
+{$ELSE}
 const
   HTTP_CONVERT: array[0..255] of PCharW = (
     ' %00#','%01#','%02#','%03#','%04#','%05#','%06#','%07#'
@@ -1182,7 +1209,7 @@ const
   );
 var
   Sp, Rp, P: PCharW;
-  Buf: array [0..4] of Byte;
+  Buf: array [0..8] of Byte;
   I, J: Integer;
 begin
   Sp := AStr;
@@ -1214,6 +1241,7 @@ begin
     Inc(Sp);
   end;
   Result := Rp - OutBuf;
+{$ENDIF}
 end;
 
 function UrlEncode(const AUrl: StringA): StringA;
@@ -1221,15 +1249,26 @@ var
   I: Integer;
 begin
   if Length(AUrl) > 0 then begin
+    {$IFDEF NEXTGEN}
+    Result.SetLength(AUrl.Length * 3);
+    I := UrlEncodeA(PAnsiChar(AUrl), PAnsiChar(Result));
+    if Result.Length <> I then
+      Result.SetLength(I);
+    {$ELSE}
     SetLength(Result, Length(AUrl) * 3);
     I := UrlEncodeA(PAnsiChar(AUrl), @Result[1]);
     if Length(Result) <> I then
       SetLength(Result, I);
+    {$ENDIF}
   end else
     Result := '';
 end;
 
 function UrlEncode(const AUrl: StringW): StringW;
+{$IFDEF NEXTGEN}
+begin
+  Result := TNetEncoding.URL.Encode(AUrl);
+{$ELSE}
 var
   I: Integer;
 begin
@@ -1240,6 +1279,7 @@ begin
       SetLength(Result, I);
   end else
     Result := '';
+{$ENDIF}
 end;
 {$ENDIF}
 
@@ -1940,7 +1980,9 @@ var
   ASize: Integer;
   ABuffer: TBytes;
   ABomExists: Boolean;
+  {$IFNDEF NEXTGEN}
   P: PAnsiChar;
+  {$ENDIF}
 begin
   ASize := AStream.Size - AStream.Position;
   if ASize>0 then begin
@@ -2326,7 +2368,7 @@ function TStringCatHelper.Cat(const V: TStream): TStringCatHelper;
 const
   BufSize = 4096;
 var
-  I: Integer;
+  I: NativeInt;
   Buf: array [0..BufSize-1] of Byte;
 begin
   Result := Self;
@@ -2338,6 +2380,11 @@ begin
         Cat(@Buf[0], I);
     end;
   end;
+end;
+
+procedure TStringCatHelper.Clear;
+begin
+  Reset;
 end;
 
 { TStringArray }
