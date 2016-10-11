@@ -892,6 +892,9 @@ function Utf8Decode(const S: AnsiString): JSONStringW; overload;
 {$ENDIF}
 function Utf8Decode(p: PAnsiChar; l: Integer): JSONStringW; overload;
 {$ENDIF}
+function ParseDateTime(s: PJSONChar; var AResult:TDateTime):Boolean;
+function ParseJsonTime(p: PJSONChar; var ATime: TDateTime): Boolean;
+function ParseWebTime(p:PJSONChar; var AResult:TDateTime):Boolean;
 
 implementation
 

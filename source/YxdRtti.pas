@@ -64,6 +64,34 @@ type
   TValueArray = array of TValue;
   {$ENDIF}
 
+  {$IFDEF USE_UNICODE}
+  /// <summary>
+  /// 注解类定义：字段名称
+  /// </summary>
+  FieldNameAttribute = class(TCustomAttribute)
+  private
+    FName: string;
+  public
+    constructor Create(const AName: string);
+    property Name: string read FName;
+  end;
+  {$ENDIF}
+
+  {$IFDEF USEDataSet}
+  // DataSet Helper
+  TDateSetHelper = class helper for TDataSet
+    function Exist(const FieldName: string): Boolean;
+    function GetBoolean(const FieldName: string; DefaultValue: Boolean = False): Boolean;
+    function GetInt(const FieldName: string; DefaultValue: Integer = 0): Integer;
+    function GetDWORD(const FieldName: string; DefaultValue: Cardinal = 0): Cardinal;
+    function GetFloat(const FieldName: string; DefaultValue: Double = 0): Double;
+    function GetDateTime(const FieldName: string): TDateTime;
+    function GetVariant(const FieldName: string): Variant;
+    function GetString(const FieldName: string): string;
+    function GetWideString(const FieldName: string): WideString;
+  end;
+  {$ENDIF}
+
 type
   TYxdSerialize = class
   protected
@@ -72,6 +100,9 @@ type
     class function ArrayItemType(ArrType: PTypeInfo): PTypeInfo;
   public
     class procedure ReadValue(AIn: JSONBase; ADest: Pointer; aType: {$IFDEF USE_UNICODE}PTypeInfo{$ELSE}PTypeInfo{$ENDIF}); overload;
+    {$IFDEF USEDataSet}
+    class procedure ReadValue(AIn: TDataSet; ADest: Pointer; aType: {$IFDEF USE_UNICODE}PTypeInfo{$ELSE}PTypeInfo{$ENDIF}); overload;
+    {$ENDIF}
     class procedure ReadObject(AIn: JSONBase; ADest: TObject);
     class procedure WriteValue(AOut: JSONBase; const Key: JSONString; ASource: Pointer; AType: PTypeInfo); overload;
     {$IFDEF USEDataSet}
@@ -95,7 +126,11 @@ type
     {$ENDIF}
     {$IFDEF USE_UNICODE}
     class procedure ReadValue(AIn: JSONBase; AInstance: TValue); overload;
-    class procedure ReadRecord<T>(AIn: JSONBase; out AInstance: T);
+    class procedure ReadRecord<T>(AIn: JSONBase; out AInstance: T); overload;
+    {$IFDEF USEDataSet}
+    class procedure ReadValue(AIn: TDataSet; AInstance: TValue); overload;
+    class procedure ReadRecord<T>(AIn: TDataSet; out AInstance: T); overload;
+    {$ENDIF}
     class function WriteToValue(AIn: PJSONValue): TValue; overload;
     class function WriteToValue(AIn: JSONBase): TValue; overload;
     class procedure WriteValue(AOut: JSONBase; const Key: JSONString; AInstance: TValue); overload;
@@ -117,6 +152,116 @@ resourcestring
   SMissRttiTypeDefine = '无法找到 %s 的RTTI类型信息，尝试将对应的类型单独定义(如array[0..1] of Byte改为TByteArr=array[0..1]，然后用TByteArr声明)。';
   SArrayTypeMissed = '未知的数组元素类型.';
   SErrorJsonType = '错误的Json类型.';
+
+{ FiledNameAttribute }
+
+{$IFDEF USE_UNICODE}
+constructor FieldNameAttribute.Create(const AName: string);
+begin
+  FName := AName;
+end; 
+{$ENDIF}
+
+{ TDateSetHelper }
+
+{$IFDEF USEDataSet}
+function TDateSetHelper.Exist(const FieldName: string): Boolean;
+begin
+  Result := FindField(FieldName) <> nil;
+end;
+
+function TDateSetHelper.GetBoolean(const FieldName: string;
+  DefaultValue: Boolean): Boolean;
+var
+  F: TField;
+begin
+  F := FindField(FieldName);
+  if Assigned(F) then
+    Result := F.AsBoolean
+  else
+    Result := DefaultValue;
+end;
+
+function TDateSetHelper.GetDateTime(const FieldName: string): TDateTime;
+var
+  F: TField;
+begin
+  F := FindField(FieldName);
+  if Assigned(F) then
+    Result := F.AsDateTime
+  else
+    Result := 0;
+end;
+
+function TDateSetHelper.GetDWORD(const FieldName: string;
+  DefaultValue: Cardinal): Cardinal;
+var
+  F: TField;
+begin
+  F := FindField(FieldName);
+  if Assigned(F) then
+    Result := F.AsInteger
+  else
+    Result := DefaultValue;
+end;
+
+function TDateSetHelper.GetFloat(const FieldName: string;
+  DefaultValue: Double): Double;
+var
+  F: TField;
+begin
+  F := FindField(FieldName);
+  if Assigned(F) then
+    Result := F.AsFloat
+  else
+    Result := DefaultValue;
+end;
+
+function TDateSetHelper.GetInt(const FieldName: string;
+  DefaultValue: Integer): Integer;
+var
+  F: TField;
+begin
+  F := FindField(FieldName);
+  if Assigned(F) and (not F.IsNull) then
+    Result := F.AsInteger
+  else
+    Result := DefaultValue;
+end;
+
+function TDateSetHelper.GetString(const FieldName: string): string;
+var
+  F: TField;
+begin
+  F := FindField(FieldName);
+  if Assigned(F) and (not F.IsNull) then
+    Result := F.AsString
+  else
+    Result := '';
+end;
+
+function TDateSetHelper.GetVariant(const FieldName: string): Variant;
+var
+  F: TField;
+begin
+  F := FindField(FieldName);
+  if Assigned(F) then
+    Result := F.AsVariant
+  else
+    Result := vaNull;
+end;
+
+function TDateSetHelper.GetWideString(const FieldName: string): WideString;
+var
+  F: TField;
+begin
+  F := FindField(FieldName);
+  if Assigned(F) then
+    Result := F.AsWideString
+  else
+    Result := '';
+end;
+{$ENDIF}
 
 { TYxdSerialize }
 
@@ -466,6 +611,13 @@ begin
 end;
 {$ENDIF}
 
+{$IFDEF USE_UNICODE} {$IFDEF USEDataSet}
+class procedure TYxdSerialize.readRecord<T>(aIn: TDataSet; out aInstance: T);
+begin
+  readValue(aIn, @aInstance, TypeInfo(T));
+end;
+{$ENDIF}{$ENDIF}
+
 {$IFDEF USE_UNICODE}
 class procedure TYxdSerialize.readValue(aIn: JSONBase; aInstance: TValue);
 begin
@@ -475,6 +627,262 @@ begin
     readValue(aIn, aInstance.GetReferenceToRawData, aInstance.TypeInfo)
   else if aInstance.Kind = tkClass then
     readValue(aIn, aInstance.AsObject, aInstance.TypeInfo);
+end;
+{$ENDIF}
+
+{$IFDEF USE_UNICODE} {$IFDEF USEDataSet}
+class procedure TYxdSerialize.readValue(aIn: TDataSet; aInstance: TValue);
+begin
+  if aInstance.IsEmpty then
+    Exit;
+  if aInstance.Kind = tkRecord then
+    readValue(aIn, aInstance.GetReferenceToRawData, aInstance.TypeInfo)
+  else if aInstance.Kind = tkClass then
+    readValue(aIn, aInstance.AsObject, aInstance.TypeInfo);
+end;
+{$ENDIF}{$ENDIF}
+
+{$IFDEF USEDataSet}
+class procedure TYxdSerialize.ReadValue(AIn: TDataSet; ADest: Pointer;
+  aType: PTypeInfo);
+
+  function StrToDateTimeDef(const V: string; const DefaultValue: TDateTime): TDateTime;
+  begin
+    if not(ParseDateTime(PJSONChar(V), Result) or
+      ParseJsonTime(PJSONChar(V), Result) or ParseWebTime(PJSONChar(V), Result)) then
+      Result := DefaultValue;
+  end;
+
+  {$IFDEF USE_UNICODE}
+  procedure ToRecord;
+  var
+    AContext: TRttiContext;
+    AFieldItem: TRttiField;
+    AFields: TArray<TRttiField>;
+    ARttiType: TRttiType;
+    ABaseAddr: Pointer;
+    AFieldName: string;
+    AFieldAttrItem: TCustomAttribute;
+    AChild: TField;
+    J: Integer;
+  begin
+    AContext := TRttiContext.Create;
+    ARttiType := AContext.GetType(AType);
+    ABaseAddr := ADest;
+    AFields := ARttiType.GetFields;
+    for J := Low(AFields) to High(AFields) do begin
+      AFieldItem := AFields[J];
+      if AFieldItem.FieldType <> nil then begin
+        AFieldName := AFieldItem.Name;
+        if AFieldItem.GetAttributes <> nil then begin
+          for AFieldAttrItem in AFieldItem.GetAttributes do             
+            if AFieldAttrItem is FieldNameAttribute then begin
+              AFieldName := FieldNameAttribute(AFieldAttrItem).Name;
+              Break;
+            end;                 
+        end;
+
+        AChild := AIn.FindField(AFieldName);
+        if AChild <> nil then begin
+          case AFieldItem.FieldType.TypeKind of
+            tkInteger:
+              begin
+                if AChild.DataType in [ftString, ftWideString] then
+                  AFieldItem.SetValue(ABaseAddr, StrToIntDef(AChild.AsString, 0))
+                else
+                  AFieldItem.SetValue(ABaseAddr, AChild.AsInteger);
+              end;
+            {$IFNDEF NEXTGEN}
+            tkString:
+              PShortString(IntPtr(ABaseAddr)+AFieldItem.Offset)^ := ShortString(AChild.AsString);
+            {$ENDIF !NEXTGEN}
+            tkUString{$IFNDEF NEXTGEN},tkLString,tkWString{$ENDIF !NEXTGEN}:
+              AFieldItem.SetValue(ABaseAddr, AChild.AsString);
+            tkEnumeration:
+              begin
+                if GetTypeData(AFieldItem.FieldType.Handle)^.BaseType^ = TypeInfo(Boolean) then
+                  AFieldItem.SetValue(ABaseAddr, AChild.AsBoolean)
+                else begin
+                  case GetTypeData(AFieldItem.FieldType.Handle).OrdType of
+                    otSByte:
+                      begin
+                        if AChild.DataType = ftInteger then
+                          PShortint(IntPtr(ABaseAddr)+AFieldItem.Offset)^ := AChild.AsInteger
+                        else
+                          PShortint(IntPtr(ABaseAddr)+AFieldItem.Offset)^ := GetEnumValue(AFieldItem.FieldType.Handle, AChild.AsString);
+                      end;
+                    otUByte:
+                      begin
+                        if AChild.DataType = ftInteger then
+                          PByte(IntPtr(ABaseAddr)+AFieldItem.Offset)^ := AChild.AsInteger
+                        else
+                          PByte(IntPtr(ABaseAddr)+AFieldItem.Offset)^ := GetEnumValue(AFieldItem.FieldType.Handle, AChild.AsString);
+                      end;
+                    otSWord:
+                      begin
+                        if AChild.DataType = ftInteger then
+                          PSmallint(IntPtr(ABaseAddr)+AFieldItem.Offset)^ := AChild.AsInteger
+                        else
+                          PSmallint(IntPtr(ABaseAddr)+AFieldItem.Offset)^ := GetEnumValue(AFieldItem.FieldType.Handle, AChild.AsString);
+                      end;
+                    otUWord:
+                      begin
+                        if AChild.DataType = ftInteger then
+                          PWord(IntPtr(ABaseAddr)+AFieldItem.Offset)^ := AChild.AsInteger
+                        else
+                          PWord(IntPtr(ABaseAddr)+AFieldItem.Offset)^ := GetEnumValue(AFieldItem.FieldType.Handle, AChild.AsString);
+                      end;
+                    otSLong:
+                      begin
+                        if AChild.DataType = ftInteger then
+                          PInteger(IntPtr(ABaseAddr)+AFieldItem.Offset)^ := AChild.AsInteger
+                        else
+                          PInteger(IntPtr(ABaseAddr)+AFieldItem.Offset)^ := GetEnumValue(AFieldItem.FieldType.Handle, AChild.AsString);
+                      end;
+                    otULong:
+                      begin
+                        if AChild.DataType = ftInteger then
+                          PCardinal(IntPtr(ABaseAddr)+AFieldItem.Offset)^ := AChild.AsInteger
+                        else
+                          PCardinal(IntPtr(ABaseAddr)+AFieldItem.Offset)^ := GetEnumValue(AFieldItem.FieldType.Handle, AChild.AsString);
+                      end;
+                  end;
+                end;
+              end;
+            tkSet:
+              begin
+                case GetTypeData(AFieldItem.FieldType.Handle).OrdType of
+                  otSByte:
+                    begin
+                      if AChild.DataType = ftInteger then
+                        PShortint(IntPtr(ABaseAddr)+AFieldItem.Offset)^ := AChild.AsInteger
+                      else
+                        PShortint(IntPtr(ABaseAddr)+AFieldItem.Offset)^ := StringToSet(AFieldItem.FieldType.Handle, AChild.AsString);
+                    end;
+                  otUByte:
+                    begin
+                      if AChild.DataType = ftInteger then
+                        PByte(IntPtr(ABaseAddr)+AFieldItem.Offset)^ := AChild.AsInteger
+                      else
+                        PByte(IntPtr(ABaseAddr)+AFieldItem.Offset)^ := StringToSet(AFieldItem.FieldType.Handle, AChild.AsString);
+                    end;
+                  otSWord:
+                    begin
+                      if AChild.DataType = ftInteger then
+                        PSmallint(IntPtr(ABaseAddr)+AFieldItem.Offset)^ := AChild.AsInteger
+                      else
+                        PSmallint(IntPtr(ABaseAddr)+AFieldItem.Offset)^ := StringToSet(AFieldItem.FieldType.Handle, AChild.AsString);
+                    end;
+                  otUWord:
+                    begin
+                      if AChild.DataType = ftInteger then
+                        PWord(IntPtr(ABaseAddr)+AFieldItem.Offset)^ := AChild.AsInteger
+                      else
+                        PWord(IntPtr(ABaseAddr)+AFieldItem.Offset)^ := StringToSet(AFieldItem.FieldType.Handle, AChild.AsString);
+                    end;
+                  otSLong:
+                    begin
+                      if AChild.DataType = ftInteger then
+                        PInteger(IntPtr(ABaseAddr)+AFieldItem.Offset)^ := AChild.AsInteger
+                      else
+                        PInteger(IntPtr(ABaseAddr)+AFieldItem.Offset)^ := StringToSet(AFieldItem.FieldType.Handle, AChild.AsString);
+                    end;
+                  otULong:
+                    begin
+                      if AChild.DataType = ftInteger then
+                        PCardinal(IntPtr(ABaseAddr)+AFieldItem.Offset)^ := AChild.AsInteger
+                      else
+                        PCardinal(IntPtr(ABaseAddr)+AFieldItem.Offset)^ := StringToSet(AFieldItem.FieldType.Handle, AChild.AsString);
+                    end;
+                end;
+              end;
+            tkChar, tkWChar:
+              AFieldItem.SetValue(ABaseAddr, AChild.AsString);
+            tkFloat:
+              if (AFieldItem.FieldType.Handle = TypeInfo(TDateTime)) or
+                (AFieldItem.FieldType.Handle = TypeInfo(TTime)) or
+                (AFieldItem.FieldType.Handle = TypeInfo(TDate))
+              then begin
+                if AChild.DataType in [ftString, ftWideString] then begin                  
+                  AFieldItem.SetValue(ABaseAddr, StrToDateTimeDef(AChild.AsString, 0))
+                end else
+                  AFieldItem.SetValue(ABaseAddr, AChild.AsDateTime)
+              end else
+                AFieldItem.SetValue(ABaseAddr, AChild.AsFloat);
+            tkInt64:
+              begin
+                if AChild.DataType in [ftString, ftWideString] then
+                  AFieldItem.SetValue(ABaseAddr, StrToIntDef(AChild.AsString, 0))
+                else
+                  AFieldItem.SetValue(ABaseAddr, AChild.AsLargeInt);
+              end;
+            tkVariant:
+              PVariant(IntPtr(ABaseAddr)+AFieldItem.Offset)^ := AChild.AsVariant;
+          end;
+        end;
+      end;
+    end;
+  end;
+  {$ENDIF}
+
+  procedure ToObject;
+  var
+    AProp: PPropInfo;
+    AObj: TObject;
+    AChild: TField;
+    J: Integer;
+  begin
+    AObj := aDest;
+    for J := 0 to aIn.FieldCount - 1 do begin
+      AChild := aIn.Fields.Fields[J];
+      AProp := GetPropInfo(AObj, AChild.Name);
+      if AProp <> nil then begin
+        case AProp.PropType^.Kind of
+          tkInteger:
+            SetOrdProp(AObj, AProp, AChild.AsInteger);
+          tkChar,tkString,tkWChar, tkLString, tkWString{$IFDEF USE_UNICODE}, tkUString{$ENDIF}:
+            SetStrProp(AObj, AProp, AChild.AsString);
+          tkEnumeration:
+            begin
+              if GetTypeData(AProp.PropType^)^.BaseType^ = TypeInfo(Boolean) then
+                SetOrdProp(AObj, AProp, Integer(AChild.AsBoolean))
+              else if AChild.DataType = ftInteger then
+                SetOrdProp(AObj, AProp, AChild.AsInteger)
+              else
+                SetEnumProp(AObj, AProp, AChild.AsString);
+            end;
+          tkSet:
+            begin
+              if AChild.DataType = ftInteger then
+                SetOrdProp(AObj, AProp, AChild.AsInteger)
+              else
+                SetSetProp(AObj, AProp, AChild.AsString);
+            end;
+          tkFloat:
+            SetFloatProp(AObj, AProp, AChild.AsFloat);
+          tkInt64:
+            SetInt64Prop(AObj, AProp, AChild.AsLargeInt);
+          tkVariant:
+            SetVariantProp(AObj, AProp, AChild.AsVariant);
+        end;
+      end;
+    end;
+  end;
+
+begin
+  if (aDest <> nil) and (Assigned(aIn)) then begin
+    {$IFDEF USE_UNICODE}
+    if aType.Kind = tkRecord then
+      ToRecord
+    else if aType.Kind = tkClass then
+      ToObject
+    {$ELSE}
+    if aType.Kind = tkClass then
+      ToObject
+    {$ENDIF}
+    else
+      raise Exception.Create(SUnsupportPropertyType);
+  end;
 end;
 {$ENDIF}
 
