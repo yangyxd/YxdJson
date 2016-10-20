@@ -1663,7 +1663,7 @@ var
 begin
   if aOut.IsJSONArray then
     aOut := JSONArray(aOut).AddChildObject()
-  else if (Length(Key) > 0) then
+  else if key <> '' then
     aOut := JSONObject(aOut).addChildObject(key);
   AddDataSet(ADataSet);
 end;
@@ -1873,16 +1873,21 @@ begin
       begin
         if aOut.IsJSONArray then
           aOut := JSONArray(aOut).AddChildObject()
-        else
-          aOut := JSONObject(aOut).addChildObject(key);
+        else begin
+          if Key <> '' then
+            aOut := JSONObject(aOut).addChildObject(key);
+        end;
         AddRecord;
       end;
     {$ENDIF}
     tkClass:
       begin
-        if TObject(ASource) is TStrings then
-          JSONObject(aOut).put(key, TStrings(ASource).Text)
-        else if TObject(ASource) is TCollection then
+        if TObject(ASource) is TStrings then begin
+          if key = '' then
+            JSONObject(aOut).put('text', TStrings(ASource).Text)
+          else
+            JSONObject(aOut).put(key, TStrings(ASource).Text)
+        end else if TObject(ASource) is TCollection then
           AddCollection(aOut, TCollection(ASource))
         {$IFDEF USEDataSet}
         else if TObject(ASource) is TDataSet then
@@ -1891,7 +1896,7 @@ begin
         else begin
           if aOut.IsJSONArray then
             aOut := JSONArray(aOut).AddChildObject()
-          else if (Length(Key) > 0) then
+          else if key <> '' then
             aOut := JSONObject(aOut).addChildObject(key);
           AddObject;
         end;

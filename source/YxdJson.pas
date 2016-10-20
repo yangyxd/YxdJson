@@ -92,7 +92,7 @@ interface
 {$DEFINE USERTTI}       // 是否使用RTTI功能
 {.$DEFINE USERegEx}      // 是否使用正则表达式搜索功能，D2010之前版本需要引用相关单元
 {$IFDEF USERTTI}
-{$DEFINE USEDBRTTI}     // 是否使用DataSet序列化功能，必须先启用USERTTI
+{.$DEFINE USEDBRTTI}     // 是否使用DataSet序列化功能，必须先启用USERTTI
 {$ENDIF}
 
 (* Delphi 版本控制条件编译 *)
