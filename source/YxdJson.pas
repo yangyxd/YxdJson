@@ -118,7 +118,7 @@ interface
       {$DEFINE JSON_RTTI}
       {$DEFINE JSON_RTTI_NAMEFIELD}
     {$ENDIF}
-  {$ENDIF}
+  {$IFEND}
 {$ENDIF}
 
 {$IFNDEF JSON_SUPPORT}

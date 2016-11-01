@@ -70,12 +70,12 @@ uses YxdJson{$IFDEF UNICODE}, uQDBJson{$ENDIF};
 type
   TJsonArrayHelper = class helper for JSONArray
   public
-    procedure ToDataSet(DataSet: TClientDataSet);
+    procedure ToDataSet2(DataSet: TClientDataSet);
   end;
 
   { TJsonArrayHelper }
 
-procedure TJsonArrayHelper.ToDataSet(DataSet: TClientDataSet);
+procedure TJsonArrayHelper.ToDataSet2(DataSet: TClientDataSet);
 var
   ii, j: Integer;
   lItem: JSONObject;

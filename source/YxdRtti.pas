@@ -47,7 +47,7 @@ interface
 
 {$IF RTLVersion>=26}
 {$DEFINE USE_UNICODE}
-{$ENDIF}
+{$IFEND}
 
 uses
   {$IFDEF USEYxdStr}YxdStr, {$ENDIF}
@@ -864,8 +864,10 @@ class procedure TYxdSerialize.ReadValue(AIn: TDataSet; ADest: Pointer;
             end;
           tkFloat:
             SetFloatProp(AObj, AProp, AChild.AsFloat);
+          {$IFDEF USE_UNICODE}
           tkInt64:
             SetInt64Prop(AObj, AProp, AChild.AsLargeInt);
+          {$ENDIF}
           tkVariant:
             SetVariantProp(AObj, AProp, AChild.AsVariant);
         end;

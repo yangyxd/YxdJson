@@ -18,14 +18,14 @@ interface
 //Delphi XE
 {$IF (RTLVersion>=26)}
 {$DEFINE USE_UNICODE}
-{$ENDIF}
+{$IFEND}
 
 //ÊÇ·ñÊ¹ÓÃInline
 {$DEFINE INLINE}
 
 {$IF (RTLVersion>=26) and (not Defined(NEXTGEN))}
 {$DEFINE ANSISTRINGS}
-{$ENDIF}
+{$IFEND}
 
 uses
   {$IFNDEF UNICODE}Windows, {$ELSE} {$IFDEF MSWINDOWS}Windows, {$ENDIF}{$ENDIF}
