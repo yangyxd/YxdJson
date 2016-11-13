@@ -239,11 +239,6 @@ type
 {$ENDIF}
 
 type
-  TJsonStringSerialize = class(TStringCatHelper)
-
-  end;
-
-type
   JSONBase = class;
   JSONObject = class;
   JSONArray = class;
@@ -935,31 +930,6 @@ function ParseJsonTime(p: PJSONChar; var ATime: TDateTime): Boolean;
 function ParseWebTime(p:PJSONChar; var AResult:TDateTime):Boolean;
 function FloatToStr(const value: Extended): string; inline;
 
-const
-  CharStringStart:  PJSONChar = '"';
-  CharStringEnd:    PJSONChar = '",';
-  CharNameEnd:      PJSONChar = '":';
-  CharArrayStart:   PJSONChar = '[';
-  CharArrayEnd:     PJSONChar = '],';
-  CharObjectStart:  PJSONChar = '{';
-  CharObjectEnd:    PJSONChar = '},';
-  CharObjectEmpty:  PJSONChar = '{} ';
-  CharNull:         PJSONChar = 'null,';
-  CharFalse:        PJSONChar = 'false,';
-  CharTrue:         PJSONChar = 'true,';
-  CharComma:        PJSONChar = ',';
-  CharNum0:         PJSONChar = '0';
-  CharNum1:         PJSONChar = '1';
-  Char7:            PJSONChar = '\b';
-  Char9:            PJSONChar = '\t';
-  Char10:           PJSONChar = '\n';
-  Char12:           PJSONChar = '\f';
-  Char13:           PJSONChar = '\r';
-  CharQuoter:       PJSONChar = '\"';
-  CharBackslash:    PJSONChar = '\\';
-  CharCode:         PJSONChar = '\u00';
-  CharEscape:       PJSONChar = '\u';
-
 implementation
 
 {$IFDEF USERTTI}uses YxdRtti;{$ENDIF}
@@ -1008,6 +978,70 @@ const
   EParse_BadNameStart       = 6;
   EParse_BadNameEnd         = 7;
   EParse_NameNotFound       = 8;
+
+const
+  CharStringStart:  PJSONChar = '"';
+  CharStringEnd:    PJSONChar = '",';
+  CharNameEnd:      PJSONChar = '":';
+  CharArrayStart:   PJSONChar = '[';
+  CharArrayEnd:     PJSONChar = '],';
+  CharObjectStart:  PJSONChar = '{';
+  CharObjectEnd:    PJSONChar = '},';
+  CharObjectEmpty:  PJSONChar = '{} ';
+  CharNull:         PJSONChar = 'null,';
+  CharFalse:        PJSONChar = 'false,';
+  CharTrue:         PJSONChar = 'true,';
+  CharComma:        PJSONChar = ',';
+  CharNum0:         PJSONChar = '0';
+  CharNum1:         PJSONChar = '1';
+  Char7:            PJSONChar = '\b';
+  Char9:            PJSONChar = '\t';
+  Char10:           PJSONChar = '\n';
+  Char12:           PJSONChar = '\f';
+  Char13:           PJSONChar = '\r';
+  CharQuoter:       PJSONChar = '\"';
+  CharBackslash:    PJSONChar = '\\';
+  CharCode:         PJSONChar = '\u00';
+  CharEscape:       PJSONChar = '\u';
+
+type
+  TJsonSerializeWriter = class(TSerializeWriter)
+  private
+    FData: TStringCatHelper;
+    FIsArray: Boolean;
+    FDoEscape: Boolean;
+    procedure WriteName(const Name: string); inline;
+  protected
+    procedure BeginRoot; override;
+    procedure EndRoot; override;
+
+    procedure BeginData(const Name: string; const IsArray: Boolean); override;
+    procedure EndData(); override;
+
+    procedure Add(const Value: string); overload; override;
+    procedure Add(const Value: Integer); overload; override;
+    procedure Add(const Value: Cardinal); overload; override;
+    procedure Add(const Value: Double); overload; override;
+    procedure Add(const Value: Variant); overload; override;
+    procedure AddTime(const Value: TDateTime); overload; override;
+    procedure AddInt64(const Value: Int64); overload; override;
+
+    procedure WriteString(const Name, Value: string); override;
+    procedure WriteInt(const Name: string; const Value: Integer); override;
+    procedure WriteInt64(const Name: string; const Value: Int64); override;
+    procedure WriteUInt(const Name: string; const Value: Cardinal); override;
+    procedure WriteDateTime(const Name: string; const Value: TDateTime); override;
+    procedure WriteBoolean(const Name: string; const Value: Boolean); override;
+    procedure WriteFloat(const Name: string; const Value: Double); override;
+    procedure WriteVariant(const Name: string; const Value: Variant); override;
+  public
+    constructor Create;
+    destructor Destroy; override;
+
+    function ToString(): string; override;
+    function IsArray: Boolean; override;
+    property DoEscape: Boolean read FDoEscape write FDoEscape;
+  end;
 
 {$IFNDEF USEYxdStr}
 //计算当前字符的长度
@@ -6351,6 +6385,315 @@ begin
   inherited Put(Index, Item);
 end;
 {$ENDIF}
+
+{ TJsonSerializeWriter }
+
+procedure TJsonSerializeWriter.AddInt64(const Value: Int64);
+begin
+  FData.Cat(IntToStr(Value)).Cat(',');
+end;
+
+procedure TJsonSerializeWriter.Add(const Value: Integer);
+begin
+  FData.Cat(IntToStr(Value)).Cat(',');
+end;
+
+procedure TJsonSerializeWriter.Add(const Value: string);
+
+  procedure CatValue(const AValue: JSONString);
+  var
+    ps: PJSONChar;
+    {$IFNDEF JSON_UNICODE}w: Word;{$ENDIF}
+  begin
+    ps := PJSONChar(AValue);
+    while ps^ <> #0 do begin
+      case ps^ of
+        #7:   FData.Cat(Char7, 2);
+        #9:   FData.Cat(Char9, 2);
+        #10:  FData.Cat(Char10, 2);
+        #12:  FData.Cat(Char12, 2);
+        #13:  FData.Cat(Char13, 2);
+        '\':  FData.Cat(CharBackslash, 2);
+        '"':  FData.Cat(CharQuoter, 2);
+        else begin
+          if ps^ < #$1F then begin
+            FData.Cat(CharCode, 4);
+            if ps^ > #$F then
+              FData.Cat(CharNum1, 1)
+            else
+              FData.Cat(CharNum0, 1);
+            FData.Cat(HexChar(Ord(ps^) and $0F));
+          end else if (ps^ <= #$7E) or (not FDoEscape) then//英文字符区
+            FData.Cat(ps, 1)
+          else
+            {$IFDEF JSON_UNICODE}
+            FData.Cat(CharEscape, 2).Cat(
+              HexChar((PWord(ps)^ shr 12) and $0F)).Cat(
+              HexChar((PWord(ps)^ shr 8) and $0F)).Cat(
+              HexChar((PWord(ps)^ shr 4) and $0F)).Cat(
+              HexChar(PWord(ps)^ and $0F));
+            {$ELSE}
+            begin
+            w := PWord(AnsiDecode(ps, 2))^;
+            FData.Cat(CharEscape, 2).Cat(
+              HexChar((w shr 12) and $0F)).Cat(
+              HexChar((w shr 8) and $0F)).Cat(
+              HexChar((w shr 4) and $0F)).Cat(
+              HexChar(w and $0F));
+            Inc(ps);
+            end;
+            {$ENDIF}
+        end;
+      end;
+      Inc(ps);
+    end;
+  end;
+
+begin
+  FData.Cat('"');
+  CatValue(Value);
+  FData.Cat('",');
+end;
+
+procedure TJsonSerializeWriter.Add(const Value: Cardinal);
+begin
+  FData.Cat(IntToStr(Value)).Cat(',');
+end;
+
+procedure TJsonSerializeWriter.Add(const Value: Variant);
+
+  procedure SetVariantArray();
+  var
+    I: Integer;
+  begin
+    BeginData('', True);
+    for I := VarArrayLowBound(Value, VarArrayDimCount(Value))
+      to VarArrayHighBound(Value, VarArrayDimCount(Value)) do
+      Add(Value[I]);
+    EndData;
+  end;
+
+begin
+  case FindVarData(Value)^.VType of
+    varBoolean: Add(Boolean(Value));
+    varByte, varWord, varSmallint, varInteger, varShortInt:
+      Add(Integer(Value));
+    varLongWord:
+      Add(Cardinal(Value));
+    varInt64:
+      AddInt64(Integer(Value));
+    varSingle, varDouble, varCurrency:
+      Add(Double(Value));
+    varDate:
+      Add(VarToDateTime(Value));
+    varOleStr, varString:
+      Add(string(Value));
+    else begin
+      if VarIsArray(Value) then begin
+        SetVariantArray();
+      end else begin
+        Add('');
+      end;
+    end;
+  end;
+end;
+
+procedure TJsonSerializeWriter.Add(const Value: Double);
+begin
+  FData.Cat(YxdJson.FloatToStr(Value)).Cat(',');
+end;
+
+procedure TJsonSerializeWriter.AddTime(const Value: TDateTime);
+
+  procedure StrictJsonTime(ATime:TDateTime);
+  const
+    JsonTimeStart: PJSONChar = '"/DATE(';
+    JsonTimeEnd:   PJSONChar = ')/"';
+  var
+    MS: Int64; //时区信息不保存
+  begin
+    MS := Trunc(ATime * 86400000);
+    FData.Cat(JsonTimeStart, 7);
+    FData.Cat(IntToStr(MS));
+    FData.Cat(JsonTimeEnd, 3);
+  end;
+
+  function ValueAsDateTime(const DateFormat, TimeFormat, DateTimeFormat: JSONString; const AValue: TDateTime): JSONString;
+  var
+    ADate: Integer;
+  begin
+    ADate := Trunc(AValue);
+    if SameValue(ADate, 0) then begin //Date为0，是时间
+      if SameValue(AValue, 0) then
+        Result := FormatDateTime(DateFormat, AValue)
+      else
+        Result := FormatDateTime(TimeFormat, AValue);
+    end else begin
+      if SameValue(AValue-ADate, 0) then
+        Result := FormatDateTime(DateFormat, AValue)
+      else
+        Result := FormatDateTime(DateTimeFormat, AValue);
+    end;
+  end;
+
+begin
+  if StrictJson then
+    StrictJsonTime(Value)
+  else
+    FData.Cat('"').Cat(ValueAsDateTime(JsonDateFormat, JsonTimeFormat, JsonDateTimeFormat, Value)).Cat('"');
+  FData.Cat(',');
+end;
+
+procedure TJsonSerializeWriter.BeginData(const Name: string; const IsArray: Boolean);
+begin
+  Push(FIsArray);
+  FIsArray := IsArray;
+  if Name <> '' then
+    FData.Cat('"').Cat(Name).Cat('":');
+  if IsArray then
+    FData.Cat('[')
+  else
+    FData.Cat('{');
+end;
+
+procedure TJsonSerializeWriter.BeginRoot;
+begin
+end;
+
+constructor TJsonSerializeWriter.Create;
+begin
+  FData := TStringCatHelper.Create;
+  FDoEscape := True;
+end;
+
+destructor TJsonSerializeWriter.Destroy;
+begin
+  FreeAndNil(FData);
+  inherited;
+end;
+
+procedure TJsonSerializeWriter.EndData;
+begin
+  if (FData.Last = ',') then
+    FData.Back(1);
+  if FIsArray then
+    FData.Cat('],')
+  else
+    FData.Cat('},');
+  FIsArray := Pop;
+end;
+
+procedure TJsonSerializeWriter.EndRoot;
+begin
+end;
+
+function TJsonSerializeWriter.IsArray: Boolean;
+begin
+  Result := FIsArray;
+end;
+
+function TJsonSerializeWriter.ToString: string;
+begin
+  if (FData.Last = ',') then
+    FData.Back(1);
+  Result := FData.Value;
+end;
+
+procedure TJsonSerializeWriter.WriteBoolean(const Name: string;
+  const Value: Boolean);
+begin
+  WriteName(Name);
+  if Value then
+    FData.Cat('true')
+  else
+    FData.Cat('false');
+  FData.Cat(',');
+end;
+
+procedure TJsonSerializeWriter.WriteDateTime(const Name: string; const Value: TDateTime);
+begin
+  WriteName(Name);
+  AddTime(Value);
+end;
+
+procedure TJsonSerializeWriter.WriteFloat(const Name: string;
+  const Value: Double);
+begin
+  WriteName(Name);
+  FData.Cat(YxdJson.FloatToStr(Value)).Cat(',');
+end;
+
+procedure TJsonSerializeWriter.WriteInt(const Name: string;
+  const Value: Integer);
+begin
+  WriteName(Name);
+  FData.Cat(IntToStr(Value)).Cat(',');
+end;
+
+procedure TJsonSerializeWriter.WriteInt64(const Name: string;
+  const Value: Int64);
+begin
+  WriteName(Name);
+  FData.Cat(IntToStr(Value)).Cat(',');
+end;
+
+procedure TJsonSerializeWriter.WriteName(const Name: string);
+begin
+  if FIsArray then Exit;
+  FData.Cat('"').Cat(Name).Cat('":');
+end;
+
+procedure TJsonSerializeWriter.WriteString(const Name, Value: string);
+begin
+  WriteName(Name);
+  Add(Value);
+end;
+
+procedure TJsonSerializeWriter.WriteUInt(const Name: string;
+  const Value: Cardinal);
+begin
+  WriteName(Name);
+  FData.Cat(IntToStr(Value)).Cat(',');
+end;
+
+procedure TJsonSerializeWriter.WriteVariant(const Name: string;
+  const Value: Variant);
+
+  procedure SetVariantArray();
+  var
+    I: Integer;
+  begin
+    BeginData(Name, True);
+    for I := VarArrayLowBound(Value, VarArrayDimCount(Value))
+      to VarArrayHighBound(Value, VarArrayDimCount(Value)) do
+      Add(Value[I]);
+    EndData;
+  end;
+
+begin
+  case FindVarData(Value)^.VType of
+    varBoolean: WriteBoolean(Name, Value);
+    varByte, varWord, varSmallint, varInteger, varShortInt:
+      WriteInt(Name, Value);
+    varLongWord:
+      WriteUInt(Name, Value);
+    varInt64:
+      WriteInt64(Name, Value);
+    varSingle, varDouble, varCurrency:
+      WriteFloat(Name, Value);
+    varDate:
+      WriteDateTime(Name, Value);
+    varOleStr, varString:
+      WriteString(Name, Value);
+    else begin
+      if VarIsArray(Value) then begin
+        SetVariantArray();
+      end else begin
+        WriteString(Name, '');
+      end;
+    end;
+  end;
+end;
 
 initialization
 

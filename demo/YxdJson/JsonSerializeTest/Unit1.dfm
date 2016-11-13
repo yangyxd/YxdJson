@@ -31,6 +31,7 @@ object Form1: TForm1
     Width = 617
     Height = 154
     Anchors = [akLeft, akTop, akRight]
+    ImeName = #20013#25991'('#31616#20307') - '#25628#29399#20116#31508#36755#20837#27861
     Lines.Strings = (
       'Memo1')
     ScrollBars = ssBoth
@@ -42,6 +43,7 @@ object Form1: TForm1
     Width = 617
     Height = 302
     Anchors = [akLeft, akTop, akRight, akBottom]
+    ImeName = #20013#25991'('#31616#20307') - '#25628#29399#20116#31508#36755#20837#27861
     Lines.Strings = (
       'Memo1')
     ScrollBars = ssBoth
