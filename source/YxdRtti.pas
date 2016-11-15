@@ -122,6 +122,7 @@ type
     procedure Add(const Value: Integer); overload; virtual; abstract;
     procedure Add(const Value: Cardinal); overload; virtual; abstract;
     procedure Add(const Value: Double); overload; virtual; abstract;
+    procedure Add(const Value: Boolean); overload; virtual; abstract;
     procedure Add(const Value: Variant); overload; virtual; abstract;
     procedure AddTime(const Value: TDateTime); overload; virtual; abstract;
     procedure AddInt64(const Value: Int64); overload; virtual; abstract;
@@ -202,8 +203,13 @@ implementation
 
 {$IFDEF USEDataSet}
 const
-  CSBlobs: JSONString = '[blobs]<';  //不要修改这个, 长度为8，方便快速比对
-  CSBlobBase64: JSONString = '[BS]'; //使用Base64编码Blob时的识别前缀
+  CSBlobs: JSONString = '[blob]<';
+  CSBlobBase64: PJSONChar = '[BS]'; //使用Base64编码Blob时的识别前缀
+  CSBlobsLen: Integer = 7;
+  CSBlobBase64Len: Integer = 4;
+var
+  CSPBlobs: PJSONChar;
+  CSPBlobs2, CSPBlobs3: PJSONChar;
 {$ENDIF}
 
 resourcestring
@@ -749,8 +755,127 @@ end;
 {$IFDEF USEDataSet}
 class procedure TYxdSerialize.Serialize(Writer: TSerializeWriter; const Key: string;
   ADataSet: TDataSet; const PageIndex, PageSize: Integer; Base64Blob: Boolean);
-begin
+var
+  BlobStream: TMemoryStream;
 
+  procedure WriteBold(Writer: TSerializeWriter; Field: TField);
+  begin
+    if not Assigned(BlobStream) then
+      BlobStream := TMemoryStream.Create
+    else
+      BlobStream.Position := 0;
+    TBlobField(Field).SaveToStream(BlobStream);
+    {$IFDEF USE_UNICODE}
+    if Base64Blob then begin
+      Writer.Add(CSBlobs + CSBlobBase64 + JSONString(EncodeBase64(BlobStream.Memory, BlobStream.Position)) + '>');
+    end else
+      Writer.Add(CSBlobs + {$IFDEF USEYxdStr}YxdStr{$ELSE}YxdJson{$ENDIF}.BinToHex(BlobStream.Memory, BlobStream.Position) + '>');
+    {$ELSE}
+    if Base64Blob then
+      Writer.Add(CSBlobs + CSBlobBase64 + Base64Encode(BlobStream.Memory^, BlobStream.Position) + '>')
+    else begin
+      Writer.Add(CSBlobs + {$IFDEF USEYxdStr}YxdStr{$ELSE}YxdJson{$ENDIF}.BinToHex(BlobStream.Memory, BlobStream.Position) + '>');
+    end;
+    {$ENDIF}
+  end;
+
+  procedure AddDataSetRow(Writer: TSerializeWriter; DS: TDataSet);
+  var
+    Field: TField;
+  begin
+    for Field in DS.Fields do begin
+      // 判断字段是否在要求内
+      if Field.IsNull then begin
+        if Field.IsBlob then
+          WriteBold(Writer, Field)
+        else
+          Writer.Add(null)
+      end else begin
+        case Field.DataType of
+          ftBoolean:
+            Writer.Add(Field.AsBoolean);
+          ftDate, ftTime, ftDateTime, ftTimeStamp{$IFDEF USE_UNICODE}, ftTimeStampOffset{$ENDIF}:
+            Writer.AddTime(Field.AsDateTime);
+          ftInteger, ftWord, ftSmallint{$IFDEF USE_UNICODE}, ftShortint{$ENDIF}:
+            Writer.Add(Field.AsInteger);
+          ftLargeint, ftAutoInc:
+            Writer.Add({$IFDEF USE_UNICODE}Field.AsLargeInt{$ELSE}Field.AsInteger{$ENDIF});
+          ftFloat, ftBCD: // ftSingle
+            Writer.Add(Field.AsFloat);
+          ftCurrency:
+            Writer.Add(Field.AsCurrency);
+          ftString, ftWideString, ftGuid:
+            Writer.Add(Field.AsString);
+          ftBlob, ftGraphic, ftMemo, ftTypedBinary:
+            begin
+              WriteBold(Writer, Field);
+            end;
+        else
+          Writer.Add(Field.AsString);
+        end;
+      end;
+    end;
+  end;
+
+  procedure AddDataSetMeta(Writer: TSerializeWriter; Field: TField);
+  begin
+    Writer.Add(Field.FieldName);
+    if Field.DataType = ftAutoInc then
+      Writer.Add(Ord(ftLargeint))
+    else
+      Writer.Add(Ord(Field.DataType));
+    Writer.Add(Field.Size);
+    Writer.Add(Field.Required);
+    Writer.Add(Field.DisplayLabel);
+  end;
+
+  procedure AddDataSet(Writer: TSerializeWriter; DS: TDataSet);
+  var
+    Field: TField;
+    MoveIndex, StepIndex: Integer;
+  begin
+    Writer.BeginData('meta', True);
+    for Field in DS.Fields do begin
+      Writer.BeginData('', True);
+      AddDataSetMeta(Writer, Field);
+      Writer.EndData;
+    end;
+    Writer.EndData;
+
+    BlobStream := nil;
+    DS.DisableControls;
+    try
+      DS.First;
+      // 分页移动记录
+      if (PageIndex > 0) and (PageSize > 0) then begin
+        MoveIndex := (PageIndex - 1) * PageSize;
+        DS.MoveBy(MoveIndex);
+      end;
+      StepIndex := 0;
+      Writer.BeginData('data', True);
+      while not DS.Eof do begin
+        Writer.BeginData('', True);
+        AddDataSetRow(Writer, DS);
+        if (PageSize > 0) then begin
+          Inc(StepIndex);
+          if StepIndex >= PageSize then
+            Break;
+        end;
+        Writer.EndData;
+        DS.Next;
+      end;
+      Writer.EndData;
+    finally
+      DS.EnableControls;
+      if Assigned(BlobStream) then
+        BlobStream.Free;
+    end;
+  end;
+
+begin
+  Writer.BeginData(Key, False);
+  AddDataSet(Writer, ADataSet);
+  Writer.EndData;
 end;
 {$ENDIF}
 
@@ -782,17 +907,20 @@ var
   BlobStream: TStream;
   {$IFDEF USE_UNICODE} BSStream: TPointerStream;{$ENDIF}
 
-  function IsBlob(p: Pointer; HighL: Integer): Boolean;
+  function IsBlob(P: PJSONChar; HighL: Integer): Boolean;
   begin
     {$IFDEF USE_UNICODE}
-    Result := (HighL >= 18)
-        and (PInt64(p)^ = $6F006C0062005B)
-        and (PInt64(IntPtr(p)+8)^ = $3C005D00730062)
-        and (PWord(IntPtr(p)+HighL-1)^ = $3E);
+    Result := (HighL >= (CSBlobsLen shl 1))
+        and (PInt64(p)^ = PInt64(CSPBlobs)^)
+        and (PDWORD(IntPtr(P)+8)^ = PDWORD(CSPBlobs2)^)
+        and (PWORD(IntPtr(P)+12)^ = PWORD(CSPBlobs3)^)
+        and (PJSONChar(IntPtr(P) + HighL - 1)^ = '>');
     {$ELSE}
-    Result := (HighL >= 9)
-        and (PInt64(IntPtr(p))^ = $3C5D73626F6C625B)
-        and (PByte(IntPtr(p)+HighL)^ = $3E);
+    Result := (HighL >= CSBlobsLen)
+        and (PDWORD(p)^ = PDWORD(CSPBlobs)^)
+        and (PWORD(IntPtr(P)+4)^ = PWORD(CSPBlobs2)^)
+        and (PByte(IntPtr(P)+6)^ = PByte(CSPBlobs3)^)
+        and (PJSONChar(IntPtr(P) + HighL)^ = '>');
     {$ENDIF}
   end;
 
@@ -807,13 +935,14 @@ var
     if I > -1 then begin
       p := @Item.FValue[0];
       {$IFDEF USE_UNICODE}
-      if IsBlob(p, I) then begin
-        Inc(p, 16);
-        if (I >= 22) and (PInt64(p)^ = $5D00530042005B) then begin
-          Inc(p, 8);
+      if IsBlob(Pointer(p), I) then begin
+        Inc(p, CSBlobsLen shl 1);
+        if (I >= (CSBlobsLen + CSBlobBase64Len) shl 1) and
+          (PInt64(p)^ = PInt64(CSBlobBase64)^) then begin
+          Inc(p, CSBlobBase64Len shl 1);
           if not Assigned(BSStream) then
             BSStream := TPointerStream.Create;
-          BSStream.SetPointer(p, I-17-8);
+          BSStream.SetPointer(p, I-((CSBlobsLen shl 1)+1)-8);
           BSStream.Position := 0;
           BStmp := TMemoryStream.Create;
           try
@@ -829,15 +958,16 @@ var
           end;
           Result := 2;
         end else begin
-          {$IFDEF USEYxdStr}YxdStr{$ELSE}YxdJson{$ENDIF}.HexToBin(Pointer(p), (I-17) shr 1, Buf);
+          {$IFDEF USEYxdStr}YxdStr{$ELSE}YxdJson{$ENDIF}.HexToBin(Pointer(p),
+            (I-(CSBlobsLen shl 1)-1) shr 1, Buf);
           Result := 1;
         end;
       {$ELSE}
       if IsBlob(p, I) then begin
-        Inc(p, 8);
-        if (I >= 13) and (PDWORD(p)^ = $5D53425B) then begin
-          Inc(p, 4);
-          BStmp := Base64Decode(p^, I-8-4);
+        Inc(p, CSBlobsLen);
+        if (I >= (CSBlobsLen + CSBlobBase64Len)) and (PDWORD(p)^ = PDWORD(CSBlobBase64)^) then begin
+          Inc(p, CSBlobBase64Len);
+          BStmp := Base64Decode(p^, I-CSBlobsLen-CSBlobBase64Len);
           if Assigned(BlobStream) then
             BlobStream.Free;
           BlobStream := ADest.CreateBlobStream(Field, bmWrite);
@@ -848,7 +978,7 @@ var
           BlobStream := nil;
           Result := 2;
         end else begin
-          {$IFDEF USEYxdStr}YxdStr{$ELSE}YxdJson{$ENDIF}.HexToBin(p, High(Item.FValue)-8, Buf);
+          {$IFDEF USEYxdStr}YxdStr{$ELSE}YxdJson{$ENDIF}.HexToBin(p, High(Item.FValue)-CSBlobsLen, Buf);
           Result := 1;
         end;
       {$ENDIF}
@@ -938,8 +1068,8 @@ begin
   Result := -1;
   if (not Assigned(aDest)) or (not Assigned(AIn)) then Exit;
   ADest.DisableControls;
+  ADest.FieldDefs.DataSet.Close;
   ADest.FieldDefs.Clear;
-  ADest.Close;
 
   if (AIn.IsJSONArray) then begin
     Meta := nil;
@@ -987,9 +1117,9 @@ begin
     end;
 
     if not ADest.Active then begin
-      if ADest is TClientDataSet then
-        TClientDataSet(ADest).CreateDataSet
-      else
+      if ADest is TClientDataSet then begin
+        TClientDataSet(ADest).CreateDataSet;
+      end else
         ADest.Open;
     end; 
     
@@ -2396,5 +2526,11 @@ begin
 end;
 {$ENDIF} 
 
+initialization
+  {$IFDEF USEDataSet}
+  CSPBlobs := PJSONChar(CSBlobs);
+  CSPBlobs2 := CSPBlobs + 4;
+  CSPBlobs3 := CSPBlobs2 + 2;
+  {$ENDIF}
 
 end.

@@ -250,7 +250,6 @@ type
   JSONValue = packed record
   private
     FObject: JSONBase;
-    function ValueAsDateTime(const DateFormat, TimeFormat, DateTimeFormat: JSONString): JSONString;
     function GetAsBoolean: Boolean;
     function GetAsByte: Byte;
     function GetAsDouble: Double;
@@ -1022,6 +1021,7 @@ type
     procedure Add(const Value: Integer); overload; override;
     procedure Add(const Value: Cardinal); overload; override;
     procedure Add(const Value: Double); overload; override;
+    procedure Add(const Value: Boolean); overload; override;
     procedure Add(const Value: Variant); overload; override;
     procedure AddTime(const Value: TDateTime); overload; override;
     procedure AddInt64(const Value: Int64); overload; override;
@@ -2983,6 +2983,86 @@ begin
 end;
 {$ENDIF} {$ENDIF}
 
+procedure CatValue(ABuilder: TStringCatHelper; const AValue: JSONString; ADoEscape: Boolean);
+var
+  ps: PJSONChar;
+  {$IFNDEF JSON_UNICODE}w: Word;{$ENDIF}
+begin
+  ps := PJSONChar(AValue);
+  while ps^ <> #0 do begin
+    case ps^ of
+      #7:   ABuilder.Cat(Char7, 2);
+      #9:   ABuilder.Cat(Char9, 2);
+      #10:  ABuilder.Cat(Char10, 2);
+      #12:  ABuilder.Cat(Char12, 2);
+      #13:  ABuilder.Cat(Char13, 2);
+      '\':  ABuilder.Cat(CharBackslash, 2);
+      '"':  ABuilder.Cat(CharQuoter, 2);
+      else begin
+        if ps^ < #$1F then begin
+          ABuilder.Cat(CharCode, 4);
+          if ps^ > #$F then
+            ABuilder.Cat(CharNum1, 1)
+          else
+            ABuilder.Cat(CharNum0, 1);
+          ABuilder.Cat(HexChar(Ord(ps^) and $0F));
+        end else if (ps^ <= #$7E) or (not ADoEscape) then//英文字符区
+          ABuilder.Cat(ps, 1)
+        else
+          {$IFDEF JSON_UNICODE}
+          ABuilder.Cat(CharEscape, 2).Cat(
+            HexChar((PWord(ps)^ shr 12) and $0F)).Cat(
+            HexChar((PWord(ps)^ shr 8) and $0F)).Cat(
+            HexChar((PWord(ps)^ shr 4) and $0F)).Cat(
+            HexChar(PWord(ps)^ and $0F));
+          {$ELSE}
+          begin
+          w := PWord(AnsiDecode(ps, 2))^;
+          ABuilder.Cat(CharEscape, 2).Cat(
+            HexChar((w shr 12) and $0F)).Cat(
+            HexChar((w shr 8) and $0F)).Cat(
+            HexChar((w shr 4) and $0F)).Cat(
+            HexChar(w and $0F));
+          Inc(ps);
+          end;
+          {$ENDIF}
+      end;
+    end;
+    Inc(ps);
+  end;
+end;
+
+procedure StrictJsonTime(ABuilder: TStringCatHelper; ATime:TDateTime);
+const
+  JsonTimeStart: PJSONChar = '"/DATE(';
+  JsonTimeEnd:   PJSONChar = ')/"';
+var
+  MS: Int64;//时区信息不保存
+begin
+  MS := Trunc(ATime * 86400000);
+  ABuilder.Cat(JsonTimeStart, 7);
+  ABuilder.Cat(IntToStr(MS));
+  ABuilder.Cat(JsonTimeEnd, 3);
+end;
+
+function ValueAsDateTime(const DateFormat, TimeFormat, DateTimeFormat: JSONString; const AValue: TDateTime): JSONString;
+var
+  ADate: Integer;
+begin
+  ADate := Trunc(AValue);
+  if SameValue(ADate, 0) then begin //Date为0，是时间
+    if SameValue(AValue, 0) then
+      Result := FormatDateTime(DateFormat, AValue)
+    else
+      Result := FormatDateTime(TimeFormat, AValue);
+  end else begin
+    if SameValue(AValue-ADate, 0) then
+      Result := FormatDateTime(DateFormat, AValue)
+    else
+      Result := FormatDateTime(DateTimeFormat, AValue);
+  end;
+end;
+
 { JSONValue }
 
 procedure JSONValue.CopyValue(ASource: PJSONValue);
@@ -3374,7 +3454,7 @@ begin
     jdtObject:
       Result := JSONBase.Encode(FObject, AIndent, ADoEscape);
     jdtDateTime:
-      Result := ValueAsDateTime(JsonDateFormat, JsonTimeFormat, JsonDateTimeFormat);
+      Result := ValueAsDateTime(JsonDateFormat, JsonTimeFormat, JsonDateTimeFormat, AsDateTime);
     jdtNull, jdtUnknown:
       Result := 'null';
   end;
@@ -3395,27 +3475,6 @@ end;
 function JSONValue.ToString: JSONString;
 begin
   Result := ToString(0);
-end;
-
-function JSONValue.ValueAsDateTime(const DateFormat, TimeFormat,
-  DateTimeFormat: JSONString): JSONString;
-var
-  ADate: Integer;
-  AValue: Double;
-begin
-  AValue := AsDateTime;
-  ADate := Trunc(AValue);
-  if SameValue(ADate, 0) then begin //Date为0，是时间
-    if SameValue(AValue, 0) then
-      Result := FormatDateTime(DateFormat, AValue)
-    else
-      Result := FormatDateTime(TimeFormat, AValue);
-  end else begin
-    if SameValue(AValue-ADate, 0) then
-      Result := FormatDateTime(DateFormat, AValue)
-    else
-      Result := FormatDateTime(DateTimeFormat, AValue);
-  end;
 end;
 
 { JSONEnumerator }
@@ -3955,68 +4014,6 @@ end;
 class function JSONBase.InternalEncode(Obj: JSONBase; ABuilder: TStringCatHelper;
   AIndent: Integer; ADoEscape: Boolean): TStringCatHelper;
 
-  procedure CatValue(const AValue: JSONString);
-  var
-    ps: PJSONChar;
-    {$IFNDEF JSON_UNICODE}w: Word;{$ENDIF}
-  begin
-    ps := PJSONChar(AValue);
-    while ps^ <> #0 do begin
-      case ps^ of
-        #7:   ABuilder.Cat(Char7, 2);
-        #9:   ABuilder.Cat(Char9, 2);
-        #10:  ABuilder.Cat(Char10, 2);
-        #12:  ABuilder.Cat(Char12, 2);
-        #13:  ABuilder.Cat(Char13, 2);
-        '\':  ABuilder.Cat(CharBackslash, 2);
-        '"':  ABuilder.Cat(CharQuoter, 2);
-        else begin
-          if ps^ < #$1F then begin
-            ABuilder.Cat(CharCode, 4);
-            if ps^ > #$F then
-              ABuilder.Cat(CharNum1, 1)
-            else
-              ABuilder.Cat(CharNum0, 1);
-            ABuilder.Cat(HexChar(Ord(ps^) and $0F));
-          end else if (ps^ <= #$7E) or (not ADoEscape) then//英文字符区
-            ABuilder.Cat(ps, 1)
-          else
-            {$IFDEF JSON_UNICODE}
-            ABuilder.Cat(CharEscape, 2).Cat(
-              HexChar((PWord(ps)^ shr 12) and $0F)).Cat(
-              HexChar((PWord(ps)^ shr 8) and $0F)).Cat(
-              HexChar((PWord(ps)^ shr 4) and $0F)).Cat(
-              HexChar(PWord(ps)^ and $0F));
-            {$ELSE}
-            begin
-            w := PWord(AnsiDecode(ps, 2))^;
-            ABuilder.Cat(CharEscape, 2).Cat(
-              HexChar((w shr 12) and $0F)).Cat(
-              HexChar((w shr 8) and $0F)).Cat(
-              HexChar((w shr 4) and $0F)).Cat(
-              HexChar(w and $0F));
-            Inc(ps);
-            end;
-            {$ENDIF}
-        end;
-      end;
-      Inc(ps);
-    end;
-  end;
-
-  procedure StrictJsonTime(ATime:TDateTime);
-  const
-    JsonTimeStart: PJSONChar = '"/DATE(';
-    JsonTimeEnd:   PJSONChar = ')/"';
-  var
-    MS: Int64;//时区信息不保存
-  begin
-    MS := Trunc(ATime * 86400000);
-    ABuilder.Cat(JsonTimeStart, 7);
-    ABuilder.Cat(IntToStr(MS));
-    ABuilder.Cat(JsonTimeEnd, 3);
-  end;
-
   procedure DoEncode(ANode: JSONBase; ALevel:Integer);
   var
     I: Integer;
@@ -4042,7 +4039,7 @@ class function JSONBase.InternalEncode(Obj: JSONBase; ABuilder: TStringCatHelper
         end;
         if Length(item.FName) > 0 then begin
           ABuilder.Cat(CharStringStart, 1);
-          CatValue(item.FName);
+          CatValue(ABuilder, item.FName, ADoEscape);
           ABuilder.Cat(CharNameEnd, 2);
         end;
         case Item.FType of
@@ -4059,7 +4056,7 @@ class function JSONBase.InternalEncode(Obj: JSONBase; ABuilder: TStringCatHelper
           jdtString:
             begin
               ABuilder.Cat(CharStringStart, 1);
-              CatValue(Item.AsString);
+              CatValue(ABuilder, Item.AsString, ADoEscape);
               ABuilder.Cat(CharStringEnd, 2);
             end;
           jdtInteger:
@@ -4081,7 +4078,7 @@ class function JSONBase.InternalEncode(Obj: JSONBase; ABuilder: TStringCatHelper
             begin
               ABuilder.Cat(CharStringStart, 1);
               if StrictJson then
-                StrictJsonTime(Item.AsDateTime)
+                StrictJsonTime(ABuilder, Item.AsDateTime)
               else
                 ABuilder.Cat(Item.ToString);
               ABuilder.Cat(CharStringEnd, 1);
@@ -6399,59 +6396,9 @@ begin
 end;
 
 procedure TJsonSerializeWriter.Add(const Value: string);
-
-  procedure CatValue(const AValue: JSONString);
-  var
-    ps: PJSONChar;
-    {$IFNDEF JSON_UNICODE}w: Word;{$ENDIF}
-  begin
-    ps := PJSONChar(AValue);
-    while ps^ <> #0 do begin
-      case ps^ of
-        #7:   FData.Cat(Char7, 2);
-        #9:   FData.Cat(Char9, 2);
-        #10:  FData.Cat(Char10, 2);
-        #12:  FData.Cat(Char12, 2);
-        #13:  FData.Cat(Char13, 2);
-        '\':  FData.Cat(CharBackslash, 2);
-        '"':  FData.Cat(CharQuoter, 2);
-        else begin
-          if ps^ < #$1F then begin
-            FData.Cat(CharCode, 4);
-            if ps^ > #$F then
-              FData.Cat(CharNum1, 1)
-            else
-              FData.Cat(CharNum0, 1);
-            FData.Cat(HexChar(Ord(ps^) and $0F));
-          end else if (ps^ <= #$7E) or (not FDoEscape) then//英文字符区
-            FData.Cat(ps, 1)
-          else
-            {$IFDEF JSON_UNICODE}
-            FData.Cat(CharEscape, 2).Cat(
-              HexChar((PWord(ps)^ shr 12) and $0F)).Cat(
-              HexChar((PWord(ps)^ shr 8) and $0F)).Cat(
-              HexChar((PWord(ps)^ shr 4) and $0F)).Cat(
-              HexChar(PWord(ps)^ and $0F));
-            {$ELSE}
-            begin
-            w := PWord(AnsiDecode(ps, 2))^;
-            FData.Cat(CharEscape, 2).Cat(
-              HexChar((w shr 12) and $0F)).Cat(
-              HexChar((w shr 8) and $0F)).Cat(
-              HexChar((w shr 4) and $0F)).Cat(
-              HexChar(w and $0F));
-            Inc(ps);
-            end;
-            {$ENDIF}
-        end;
-      end;
-      Inc(ps);
-    end;
-  end;
-
 begin
   FData.Cat('"');
-  CatValue(Value);
+  CatValue(FData, Value, FDoEscape);
   FData.Cat('",');
 end;
 
@@ -6498,47 +6445,20 @@ begin
   end;
 end;
 
+procedure TJsonSerializeWriter.Add(const Value: Boolean);
+begin
+  FData.Cat(BoolToStr(Value)).Cat(',');
+end;
+
 procedure TJsonSerializeWriter.Add(const Value: Double);
 begin
-  FData.Cat(YxdJson.FloatToStr(Value)).Cat(',');
+  FData.Cat(FloatToStr(Value)).Cat(',');
 end;
 
 procedure TJsonSerializeWriter.AddTime(const Value: TDateTime);
-
-  procedure StrictJsonTime(ATime:TDateTime);
-  const
-    JsonTimeStart: PJSONChar = '"/DATE(';
-    JsonTimeEnd:   PJSONChar = ')/"';
-  var
-    MS: Int64; //时区信息不保存
-  begin
-    MS := Trunc(ATime * 86400000);
-    FData.Cat(JsonTimeStart, 7);
-    FData.Cat(IntToStr(MS));
-    FData.Cat(JsonTimeEnd, 3);
-  end;
-
-  function ValueAsDateTime(const DateFormat, TimeFormat, DateTimeFormat: JSONString; const AValue: TDateTime): JSONString;
-  var
-    ADate: Integer;
-  begin
-    ADate := Trunc(AValue);
-    if SameValue(ADate, 0) then begin //Date为0，是时间
-      if SameValue(AValue, 0) then
-        Result := FormatDateTime(DateFormat, AValue)
-      else
-        Result := FormatDateTime(TimeFormat, AValue);
-    end else begin
-      if SameValue(AValue-ADate, 0) then
-        Result := FormatDateTime(DateFormat, AValue)
-      else
-        Result := FormatDateTime(DateTimeFormat, AValue);
-    end;
-  end;
-
 begin
   if StrictJson then
-    StrictJsonTime(Value)
+    StrictJsonTime(FData, Value)
   else
     FData.Cat('"').Cat(ValueAsDateTime(JsonDateFormat, JsonTimeFormat, JsonDateTimeFormat, Value)).Cat('"');
   FData.Cat(',');
@@ -6620,7 +6540,7 @@ procedure TJsonSerializeWriter.WriteFloat(const Name: string;
   const Value: Double);
 begin
   WriteName(Name);
-  FData.Cat(YxdJson.FloatToStr(Value)).Cat(',');
+  FData.Cat(FloatToStr(Value)).Cat(',');
 end;
 
 procedure TJsonSerializeWriter.WriteInt(const Name: string;
