@@ -59,6 +59,8 @@ uses
   SysUtils, Classes, Variants, TypInfo, Math;
 
 type
+  PDWORD = ^Cardinal;
+
   /// <summary>
   /// 序列化类型
   /// </summary>
