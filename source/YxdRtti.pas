@@ -38,6 +38,10 @@ unit YxdRtti;
 
 interface
 
+{$IF RTLVersion>=24}
+{$LEGACYIFEND ON}
+{$IFEND}
+
 {$DEFINE USEYxdStr}               // 是否使用YxdStr单元
 {$DEFINE USEIniSerialize}         // 使用INI序列化模块
 {$DEFINE USEXmlSerialize}         // 使用XML序列化模块

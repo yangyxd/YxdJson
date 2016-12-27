@@ -10,6 +10,10 @@ unit YxdStr;
 
 interface
 
+{$IF RTLVersion>=24}
+{$LEGACYIFEND ON}
+{$IFEND}
+
 // 是否使用URL函数
 {$DEFINE USE_URLFUNC}
 // 是否使用字符串编码转换函数
@@ -48,6 +52,7 @@ type
     function GetLength:Integer;
     procedure SetLength(const Value: Integer);
     function GetIsUtf8: Boolean;
+    procedure SetIsUtf8(const V: Boolean);
   public
     class operator Implicit(const S:WideString):AnsiString;
     class operator Implicit(const S:AnsiString):PAnsiChar;
@@ -59,7 +64,7 @@ type
     procedure From(p:PAnsiChar;AOffset,ALen:Integer);
     property Chars[AIndex:Integer]:AnsiChar read GetChars write SetChars;default;
     property Length:Integer read GetLength write SetLength;
-    property IsUtf8:Boolean read GetIsUtf8;
+    property IsUtf8:Boolean read GetIsUtf8 write SetIsUtf8;
   end;
   {$ENDIF}
   
@@ -306,8 +311,8 @@ function LoadTextA(AStream: TStream; AEncoding: TTextEncoding=teUnknown): String
 function LoadTextU(AStream: TStream; AEncoding: TTextEncoding=teUnknown): StringA; overload;
 function LoadTextW(AStream: TStream; AEncoding: TTextEncoding=teUnknown): StringW; overload;
 {$ENDIF}
-function BinToHex(p: Pointer; l: Integer): string; overload;
-function BinToHex(const ABytes:TBytes): string; overload;
+function BinToHex(p: Pointer; l: Integer; ALowerCase: Boolean = False): string; overload;
+function BinToHex(const ABytes:TBytes; ALowerCase: Boolean = False): string; overload;
 procedure HexToBin(p: Pointer; l: Integer; var AResult: TBytes); overload;
 function HexToBin(const S: String): TBytes; overload;
 procedure HexToBin(const S: String; var AResult: TBytes); overload;
@@ -1640,10 +1645,10 @@ begin
     SetLength(Result, len);
     WideCharToMultiByte(CP_ACP,0,p,l,PAnsiChar(Result), len, nil, nil);
     {$ELSE}
-    Result.Length:=l shl 1;
+    Result.Length:= l shl 1;
     Result.FValue[0]:=0;
-    Move(p^,PAnsiChar(Result)^,l shl 1);
-    Result:=TEncoding.Convert(TEncoding.Unicode,TEncoding.ANSI,Result.FValue,1,l shl 1);
+    Move(p^,PAnsiChar(Result)^, l shl 1);
+    Result := TEncoding.Convert(TEncoding.Unicode, TEncoding.GetEncoding('GB2312'), Result.FValue, 1, l shl 1);
     {$ENDIF}
   end else
     Result := '';
@@ -1744,17 +1749,17 @@ begin
       while ps^<>#0 do
         Inc(ps);
       l:=ps-p;
-      end;
+    end;
     {$IFDEF NEXTGEN}
-    Result.Length:=l*6;
+    Result.Length:=l*3;
+    Result.IsUtf8 := True;
     {$ELSE}
-    SetLength(Result, l*6);//UTF8每个字符最多6字节长,一次性分配足够的空间
+    SetLength(Result, l*3);//UTF8每个字符最多6字节长,一次性分配足够的空间
     {$ENDIF}
     if l>0 then begin
-      Result[1] := {$IFDEF NEXTGEN}1{$ELSE}#1{$ENDIF};
-      ps:=p;
-      pd:=PAnsiChar(Result);
-      pds:=pd;
+      ps := p;
+      pd := PAnsiChar(Result);
+      pds := pd;
       while l>0 do begin
         c:=Cardinal(ps^);
         Inc(ps);
@@ -1844,103 +1849,121 @@ function Utf8Decode(const S: AnsiString): StringW; overload;
 begin
   if S.IsUtf8 then
     Result := Utf8Decode(PAnsiChar(S), S.Length)
+  else if {$IFDEF NEXTGEN}S.Length{$ELSE}Length(S){$ENDIF} > 0 then
+    Result := AnsiDecode(S)
   else
-    Result := AnsiDecode(S);
+    Result := '';
 end;
 {$ENDIF} {$ENDIF}
 
 {$IFDEF USE_STRENCODEFUNC}
 function Utf8Decode(p: PAnsiChar; l: Integer): StringW;
+
+  function _UTF8Decode(p: PAnsiChar; l: Integer): StringW;
+  var
+    ps,pe: PByte;
+    pd,pds: PWord;
+    c: Cardinal;
+  begin
+    ps := PByte(p);
+    pe := ps;
+    Inc(pe, l);
+    System.SetLength(Result, l);
+    pd := PWord(PWideChar(Result));
+    pds := pd;
+    while Integer(ps)<Integer(pe) do begin
+      if (ps^ and $80)<>0 then begin
+        if (ps^ and $FC)=$FC then begin //4000000+
+          c:=(ps^ and $03) shl 30;
+          Inc(ps);
+          c:=c or ((ps^ and $3F) shl 24);
+          Inc(ps);
+          c:=c or ((ps^ and $3F) shl 18);
+          Inc(ps);
+          c:=c or ((ps^ and $3F) shl 12);
+          Inc(ps);
+          c:=c or ((ps^ and $3F) shl 6);
+          Inc(ps);
+          c:=c or (ps^ and $3F);
+          Inc(ps);
+          c:=c-$10000;
+          pd^:=$D800+((c shr 10) and $3FF);
+          Inc(pd);
+          pd^:=$DC00+(c and $3FF);
+          Inc(pd);
+        end else if (ps^ and $F8)=$F8 then begin //200000-3FFFFFF
+          c:=(ps^ and $07) shl 24;
+          Inc(ps);
+          c:=c or ((ps^ and $3F) shl 18);
+          Inc(ps);
+          c:=c or ((ps^ and $3F) shl 12);
+          Inc(ps);
+          c:=c or ((ps^ and $3F) shl 6);
+          Inc(ps);
+          c:=c or (ps^ and $3F);
+          Inc(ps);
+          c:=c-$10000;
+          pd^:=$D800+((c shr 10) and $3FF);
+          Inc(pd);
+          pd^:=$DC00+(c and $3FF);
+          Inc(pd);
+        end else if (ps^ and $F0)=$F0 then begin //10000-1FFFFF
+          c:=(ps^ and $0F) shr 18;
+          Inc(ps);
+          c:=c or ((ps^ and $3F) shl 12);
+          Inc(ps);
+          c:=c or ((ps^ and $3F) shl 6);
+          Inc(ps);
+          c:=c or (ps^ and $3F);
+          Inc(ps);
+          c:=c-$10000;
+          pd^:=$D800+((c shr 10) and $3FF);
+          Inc(pd);
+          pd^:=$DC00+(c and $3FF);
+          Inc(pd);
+        end else if (ps^ and $E0)=$E0 then begin //800-FFFF
+          c:=(ps^ and $1F) shl 12;
+          Inc(ps);
+          c:=c or ((ps^ and $3F) shl 6);
+          Inc(ps);
+          c:=c or (ps^ and $3F);
+          Inc(ps);
+          pd^:=c;
+          Inc(pd);
+        end else if (ps^ and $C0)=$C0 then begin //80-7FF
+          pd^:=(ps^ and $3F) shl 6;
+          Inc(ps);
+          pd^:=pd^ or (ps^ and $3F);
+          Inc(pd);
+          Inc(ps);
+        end else
+          raise Exception.Create(Format('无效的UTF8字符:%d',[Integer(ps^)]));
+      end else begin
+        pd^ := ps^;
+        Inc(ps);
+        Inc(pd);
+      end;
+    end;
+    System.SetLength(Result, (Integer(pd)-Integer(pds)) shr 1);
+  end;
+
 var
-  ps,pe: PByte;
-  pd,pds: PWord;
-  c: Cardinal;
+  ps: PByte;
 begin
   if l<=0 then begin
-    ps:=PByte(p);
+    ps := PByte(p);
     while ps^<>0 do Inc(ps);
     l := Integer(ps) - Integer(p);
-  end;
-  ps := PByte(p);
-  pe := ps;
-  Inc(pe, l);
-  System.SetLength(Result, l);
-  pd := PWord(PWideChar(Result));
-  pds := pd;
-  while Integer(ps)<Integer(pe) do begin
-    if (ps^ and $80)<>0 then begin
-      if (ps^ and $FC)=$FC then begin //4000000+
-        c:=(ps^ and $03) shl 30;
-        Inc(ps);
-        c:=c or ((ps^ and $3F) shl 24);
-        Inc(ps);
-        c:=c or ((ps^ and $3F) shl 18);
-        Inc(ps);
-        c:=c or ((ps^ and $3F) shl 12);
-        Inc(ps);
-        c:=c or ((ps^ and $3F) shl 6);
-        Inc(ps);
-        c:=c or (ps^ and $3F);
-        Inc(ps);
-        c:=c-$10000;
-        pd^:=$D800+((c shr 10) and $3FF);
-        Inc(pd);
-        pd^:=$DC00+(c and $3FF);
-        Inc(pd);
-      end else if (ps^ and $F8)=$F8 then begin //200000-3FFFFFF
-        c:=(ps^ and $07) shl 24;
-        Inc(ps);
-        c:=c or ((ps^ and $3F) shl 18);
-        Inc(ps);
-        c:=c or ((ps^ and $3F) shl 12);
-        Inc(ps);
-        c:=c or ((ps^ and $3F) shl 6);
-        Inc(ps);
-        c:=c or (ps^ and $3F);
-        Inc(ps);
-        c:=c-$10000;
-        pd^:=$D800+((c shr 10) and $3FF);
-        Inc(pd);
-        pd^:=$DC00+(c and $3FF);
-        Inc(pd);
-      end else if (ps^ and $F0)=$F0 then begin //10000-1FFFFF
-        c:=(ps^ and $0F) shr 18;
-        Inc(ps);
-        c:=c or ((ps^ and $3F) shl 12);
-        Inc(ps);
-        c:=c or ((ps^ and $3F) shl 6);
-        Inc(ps);
-        c:=c or (ps^ and $3F);
-        Inc(ps);
-        c:=c-$10000;
-        pd^:=$D800+((c shr 10) and $3FF);
-        Inc(pd);
-        pd^:=$DC00+(c and $3FF);
-        Inc(pd);
-      end else if (ps^ and $E0)=$E0 then begin //800-FFFF
-        c:=(ps^ and $1F) shl 12;
-        Inc(ps);
-        c:=c or ((ps^ and $3F) shl 6);
-        Inc(ps);
-        c:=c or (ps^ and $3F);
-        Inc(ps);
-        pd^:=c;
-        Inc(pd);
-      end else if (ps^ and $C0)=$C0 then begin //80-7FF
-        pd^:=(ps^ and $3F) shl 6;
-        Inc(ps);
-        pd^:=pd^ or (ps^ and $3F);
-        Inc(pd);
-        Inc(ps);
-      end else
-        raise Exception.Create(Format('无效的UTF8字符:%d',[Integer(ps^)]));
-    end else begin
-      pd^ := ps^;
-      Inc(ps);
-      Inc(pd);
-    end;
-  end;
-  System.SetLength(Result, (Integer(pd)-Integer(pds)) shr 1);
+  end else
+    ps := PByte(P);
+  {$IFDEF MSWINDOWS}
+  SetLength(Result, l);
+  SetLength(Result, MultiByteToWideChar(CP_UTF8, 0, PAnsiChar(p), l, PCharW(Result), l));
+  if Length(Result) = 0 then
+    Result := _UTF8Decode(Pointer(ps), l);
+  {$ELSE}
+  Result := _UTF8Decode(Pointer(ps), l);
+  {$ENDIF}
 end;
 {$ENDIF}
 
@@ -2107,7 +2130,7 @@ end;
 
 class operator AnsiString.Implicit(const S: AnsiString): PAnsiChar;
 begin
-  Result:=PansiChar(@S.FValue[1]);
+  Result:= Pointer(@S.FValue[1]);
 end;
 
 function AnsiString.GetIsUtf8: Boolean;
@@ -2116,6 +2139,13 @@ begin
     Result:=(FValue[0]=1)
   else
     Result:=False;
+end;
+
+procedure AnsiString.SetIsUtf8(const V: Boolean);
+begin
+  if System.Length(FValue) = 0 then
+    System.SetLength(FValue, 1);
+  FValue[0] := Byte(V);
 end;
 
 function AnsiString.GetLength: Integer;
@@ -2717,9 +2747,10 @@ begin
     Result := Char(v-10 + Ord('A'));
 end;
 
-function BinToHex(p:Pointer;l:Integer): String;
+function BinToHex(p:Pointer;l:Integer; ALowerCase: Boolean): String;
 const
   B2HConvert: array[0..15] of Char = ('0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F');
+  B2HConvertL: array[0..15] of Char = ('0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f');
 var
   pd: PChar;
   pb: PByte;
@@ -2727,19 +2758,30 @@ begin
   SetLength(Result, l shl 1);
   pd := PChar(Result);
   pb := p;
-  while l>0 do begin
-    pd^ := B2HConvert[pb^ shr 4];
-    Inc(pd);
-    pd^ := B2HConvert[pb^ and $0F];
-    Inc(pd);
-    Inc(pb);
-    Dec(l);
+  if ALowerCase then begin
+    while l>0 do begin
+      pd^ := B2HConvertL[pb^ shr 4];
+      Inc(pd);
+      pd^ := B2HConvertL[pb^ and $0F];
+      Inc(pd);
+      Inc(pb);
+      Dec(l);
+    end;
+  end else begin
+    while l>0 do begin
+      pd^ := B2HConvert[pb^ shr 4];
+      Inc(pd);
+      pd^ := B2HConvert[pb^ and $0F];
+      Inc(pd);
+      Inc(pb);
+      Dec(l);
+    end;
   end;
 end;
 
-function BinToHex(const ABytes:TBytes): String;
+function BinToHex(const ABytes:TBytes; ALowerCase: Boolean): String;
 begin
-  Result:=BinToHex(@ABytes[0], Length(ABytes));
+  Result:=BinToHex(@ABytes[0], Length(ABytes), ALowerCase);
 end;
 
 procedure HexToBin(p: pointer; l: Integer; var AResult: TBytes);

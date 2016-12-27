@@ -92,6 +92,10 @@ unit YxdJson;
 
 interface
 
+{$IF RTLVersion>=24}
+{$LEGACYIFEND ON}
+{$IFEND}
+
 (* 功能可选项条件编译 *)
 {$DEFINE USEYxdStr}     // 是否使用YxdStr单元
 {$DEFINE USERTTI}       // 是否使用RTTI功能
@@ -736,6 +740,7 @@ type
     property O[const Key: JSONString]: JSONObject read GetJsonObject write SetJsonObject;
     property A[const Key: JSONString]: JSONArray read GetJsonArray write SetJsonArray;
     property V[const Key: JSONString]: Variant read GetVariant write SetVariant;
+    property T[const Key: JSONString]: TDateTime read GetDateTime write SetDateTime;
 
     // 不存在时会自动添加
     property Child[const Key: JSONString]: PJSONValue read GetChildItem; 
@@ -813,7 +818,8 @@ type
     property F[Index: Integer]: Double read GetDouble write SetDouble;
     property O[Index: Integer]: JSONObject read GetJsonObject write SetJsonObject;
     property A[Index: Integer]: JSONArray read GetJsonArray write SetJsonArray;
-    property V[Index: Integer]: Variant read GetVariant write SetVariant; 
+    property V[Index: Integer]: Variant read GetVariant write SetVariant;
+    property T[Index: Integer]: TDateTime read GetDateTime write SetDateTime;
   end;
 
 const
