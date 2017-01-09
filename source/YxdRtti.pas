@@ -57,14 +57,13 @@ uses
   {$IFDEF USEYxdStr}YxdStr, {$ENDIF}
   {$IFDEF MSWINDOWS}Windows, {$ENDIF}
   {$IFDEF USE_UNICODE}Generics.Collections, Rtti, {$ENDIF}
-  {$IFDEF USE_UNICODE}Soap.EncdDecd, System.NetEncoding, {$ELSE}Base64, {$ENDIF}
+  {$IFDEF USE_UNICODE}Soap.EncdDecd, {$ELSE}Base64, {$ENDIF}
+  {$IF CompilerVersion > 27}System.NetEncoding, {$IFEND}
   {$IFDEF USEDataSet}DB, DBClient, {$ENDIF}
   {$IFDEF USEJsonSerialize}YxdJson, {$ENDIF}   
   SysUtils, Classes, Variants, TypInfo, Math;
 
 type
-  PDWORD = ^Cardinal;
-
   /// <summary>
   /// 序列化类型
   /// </summary>
