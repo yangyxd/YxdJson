@@ -1981,7 +1981,7 @@ begin
     if AEncoding in [teUnknown,teAuto] then
       AEncoding := DetectTextEncoding(@ABuffer[0], ASize, ABomExists);
     if AEncoding=teAnsi then
-      Result := AnsiString(ABuffer)
+      SetString(Result, PChar(ABuffer), Length(ABuffer))
     else if AEncoding = teUTF8 then begin
       if ABomExists then
         Result := AnsiEncode(Utf8Decode(@ABuffer[3], ASize-3))
