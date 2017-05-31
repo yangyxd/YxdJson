@@ -5612,7 +5612,7 @@ begin
   Result := GetItem(Key);
   if (Result = nil) and (Length(Key) > 0) then 
     Result := Add(Key)
-  else
+  else if Result = nil then        
     raise Exception.Create(SNameNotFound);
 end;
 
