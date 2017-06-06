@@ -47,10 +47,10 @@ interface
 {$DEFINE USEXmlSerialize}         // 使用XML序列化模块
 {$DEFINE USEJsonSerialize}        // 使用Json序列化模块
 
-{$DEFINE USEDataSet}              // 是否使用DataSet序列化功能
 
 {$IF RTLVersion>=26}
 {$DEFINE USE_UNICODE}
+{$DEFINE USEDataSet}              // 是否使用DataSet序列化功能
 {$IFEND}
 
 uses
@@ -630,7 +630,7 @@ class procedure TYxdSerialize.Serialize(Writer: TSerializeWriter; const Key: str
             end;
           tkVariant:
             begin                
-              Writer.WriteVariant(AName, GetPropValue(AObj,APropList[J]));
+              Writer.WriteVariant(AName, GetPropValue(AObj,APropList[J].Name));
             end;
           tkInt64:
             Writer.WriteInt64(AName, GetInt64Prop(AObj,APropList[J]));
@@ -2415,7 +2415,7 @@ class procedure TYxdSerialize.writeValue(aOut: JSONBase; const key: JSONString; 
                 JSONObject(aOut).put(AName, GetSetProp(AObj,APropList[J],True));
             end;
           tkVariant:
-            JSONObject(aOut).put(AName, GetPropValue(AObj,APropList[J]));
+            JSONObject(aOut).put(AName, GetPropValue(AObj,APropList[J].Name));
           tkInt64:
             JSONObject(aOut).put(AName, GetInt64Prop(AObj,APropList[J]));
           tkRecord, tkArray, tkDynArray://记录、数组、动态数组属性系统也不保存，也没提供所有太好的接口

@@ -17,7 +17,10 @@
  --------------------------------------------------------------------
   更新记录
  --------------------------------------------------------------------
- 
+ ver 1.0.17 2017.06.06
+ --------------------------------------------------------------------
+  + 增加 Delphi 7 支持
+  
  ver 1.0.16 2016.11.13
  --------------------------------------------------------------------
   + 增加 Parser 类函数，可以自动解析Json字符串为JSONObject或JSONArray.
@@ -96,12 +99,28 @@ interface
 {$LEGACYIFEND ON}
 {$IFEND}
 
+{$ifdef VER150}
+  {$define Version7}
+  {$DEFINE JSON_SUPPORT}
+{$endif}
+
+// D2006
+{$if CompilerVersion >= 18.0}         // bds 2006
+{$DEFINE USEINLINE}
+{$else}
+{$IFNDEF Version7}
+{$DEFINE USEINLINE}
+{$ENDIF}
+{$ifend}
+
 (* 功能可选项条件编译 *)
 {$DEFINE USEYxdStr}     // 是否使用YxdStr单元
 {$DEFINE USERTTI}       // 是否使用RTTI功能
 {.$DEFINE USERegEx}      // 是否使用正则表达式搜索功能，D2010之前版本需要引用相关单元
 {$IFDEF USERTTI}
-{$DEFINE USEDBRTTI}     // 是否使用DataSet序列化功能，必须先启用USERTTI
+  {$IFNDEF Version7}
+  {$DEFINE USEDBRTTI}    // 是否使用DataSet序列化功能，必须先启用USERTTI
+  {$ENDIF}
 {$ENDIF}
 
 (* Delphi 版本控制条件编译 *)
@@ -131,7 +150,7 @@ interface
 {$ENDIF}
 
 {$IFNDEF JSON_SUPPORT}
-{$MESSAGE WARN '!!!JSON Only test in 2007 and XE6,No support in other version!!!'}
+{$MESSAGE WARN '!!!JSON Only test in D7, 2007 and XE6,No support in other version!!!'}
 {$ENDIF}
 
 uses
@@ -191,6 +210,9 @@ type
   {$IFNDEF USEYxdStr}
   TIntArray = array of Integer;
   IntPtr = Integer;
+    {$IFNDEF USEINLINE}
+    TBytes = array of Byte;
+    {$ENDIF}
   {$ENDIF}
   {$ENDIF}
 
@@ -218,6 +240,7 @@ type
     function GetChars(AIndex:Integer): JSONChar;
     procedure SetPosition(const Value: Integer);
     procedure NeedSize(ASize:Integer);
+    function GetLast: PJSONChar;
   public
     constructor Create; overload;
     constructor Create(ASize: Integer); overload;
@@ -237,6 +260,7 @@ type
     property Value: JSONString read GetValue;
     property Chars[Index: Integer]: JSONChar read GetChars;
     property Start: PJSONChar read FStart;
+    property Last: PJSONChar read GetLast;
     property Current: PJSONChar read FDest;
     property Position: Integer read GetPosition write SetPosition;
   end;
@@ -251,7 +275,7 @@ type
   /// JSON节点
   /// </summary>
   PJSONValue = ^JSONValue;
-  JSONValue = packed record
+  JSONValue = {$IFNDEF USEINLINE}object{$ELSE}packed record{$ENDIF}
   private
     FObject: JSONBase;
     function GetAsBoolean: Boolean;
@@ -296,7 +320,7 @@ type
     // 将当前json数据转换为TValue类型的值
     function ToObjectValue: TValue;
     {$ENDIF}
-    procedure CopyValue(ASource: PJSONValue); inline;
+    procedure CopyValue(ASource: PJSONValue); {$IFDEF USEINLINE}inline;{$ENDIF}
 
     function TryAsDatetime(const DefaultValue: TDateTime = 0): TDateTime;
 
@@ -321,7 +345,7 @@ type
     FList: JSONBase;
   public
     constructor Create(AList: JSONBase);
-    function GetCurrent: PJSONValue; inline;
+    function GetCurrent: PJSONValue; {$IFDEF USEINLINE}inline;{$ENDIF}
     function MoveNext: Boolean;
     property Current: PJSONValue read GetCurrent;
   end;
@@ -331,8 +355,8 @@ type
   {$ELSE}
   JSONList = class(TList)
   protected
-    function Get(Index: Integer): PJSONValue; inline;
-    procedure Put(Index: Integer; Item: PJSONValue); inline;
+    function Get(Index: Integer): PJSONValue; {$IFDEF USEINLINE}inline;{$ENDIF}
+    procedure Put(Index: Integer; Item: PJSONValue); {$IFDEF USEINLINE}inline;{$ENDIF}
   public
     property Items[Index: Integer]: PJSONValue read Get write Put; default;  
   end;
@@ -375,6 +399,7 @@ type
     procedure RaiseParseException(ACode: Integer; ps, p: PJSONChar);
     function GetIsJSONArray: Boolean;
     function GetIsJSONObject: Boolean;
+    function GetPathPro: JSONString; overload;
 
     //新加一个子JSON对象
     function NewChildObject(const key: JSONString): JSONObject; //inline;
@@ -426,8 +451,7 @@ type
     /// <summary>获取for..in需要的GetEnumerator支持</summary>
     function GetEnumerator: JSONEnumerator;
     /// <summary>获取当前节点的路径</summary>
-    function GetPath: JSONString; overload;
-    function GetPath(const ADelimiter: JSONChar): JSONString; overload;
+    function GetPath(const ADelimiter: JSONChar = '\'): JSONString; overload;
 
     /// <summary>编码JSON对象为字符串, 与toString相同</summary>
     /// <param name="AIndent">缩进单位大小</param>
@@ -638,7 +662,7 @@ type
     //子结点的值
     property Value: JSONString read GetValue write SetValue;
     //结点的路径，路径中间以"\"分隔
-    property Path: JSONString read GetPath;
+    property Path: JSONString read GetPathPro;
     //在父结点中的索引顺序，从0开始，如果是-1，则代表自己是根结点
     property ItemIndex: Integer read GetItemIndex;
     //节点名称(没有父节点设置名称后无效)
@@ -731,7 +755,7 @@ type
     procedure SetDateTime(const Key: JSONString; const Value: TDateTime);
 
     // SuperJson 接口
-    function Contains(const Key: JSONString): Boolean; inline;
+    function Contains(const Key: JSONString): Boolean; {$IFDEF USEINLINE}inline;{$ENDIF}
     
     property S[const Key: JSONString]: JSONString read GetString write SetString;
     property I[const Key: JSONString]: Int64 read GetInt64 write SetInt64;
@@ -750,7 +774,7 @@ type
 
   JSONArray = class(JSONBase)
   private
-    function NewJsonValue(): PJSONValue; inline;
+    function NewJsonValue(): PJSONValue; {$IFDEF USEINLINE}inline;{$ENDIF}
   protected
     function GetIsArray: Boolean; override;
   public
@@ -849,7 +873,7 @@ var
 {$IFNDEF USEYxdStr}
 function StrDupX(const s: PJSONChar; ACount:Integer): JSONString;
 function StrDup(const S: PJSONChar; AOffset: Integer = 0; const ACount: Integer = MaxInt): JSONString;
-function IsHexChar(c: JSONChar): Boolean; inline;
+function IsHexChar(c: JSONChar): Boolean; {$IFDEF USEINLINE}inline;{$ENDIF}
 function HexValue(c: JSONChar): Integer;
 function HexChar(v: Byte): JSONChar;
 function BinToHex(p: Pointer; l: Integer): JSONString; overload;
@@ -860,7 +884,7 @@ procedure HexToBin(const S: JSONString; var AResult: TBytes); overload;
 {$ENDIF}
 //检查字符是否在指定的列表中
 {$IFNDEF USEYxdStr}
-function CharIn(const c, list: PJSONChar; ACharLen:PInteger = nil): Boolean; inline;
+function CharIn(const c, list: PJSONChar; ACharLen:PInteger = nil): Boolean; {$IFDEF USEINLINE}inline;{$ENDIF}
 {$IFNDEF NEXTGEN}
 function CharInA(c, list: PAnsiChar; ACharLen: PInteger = nil): Boolean;
 function CharInU(c, list: PAnsiChar; ACharLen: PInteger = nil): Boolean;
@@ -933,7 +957,7 @@ function Utf8Decode(p: PAnsiChar; l: Integer): JSONStringW; overload;
 function ParseDateTime(s: PJSONChar; var AResult:TDateTime):Boolean;
 function ParseJsonTime(p: PJSONChar; var ATime: TDateTime): Boolean;
 function ParseWebTime(p:PJSONChar; var AResult:TDateTime):Boolean;
-function FloatToStr(const value: Extended): string; inline;
+function FloatToStr(const value: Extended): string; {$IFDEF USEINLINE}inline;{$ENDIF}
 
 implementation
 
@@ -1015,7 +1039,7 @@ type
     FData: TStringCatHelper;
     FIsArray: Boolean;
     FDoEscape: Boolean;
-    procedure WriteName(const Name: string); inline;
+    procedure WriteName(const Name: string); {$IFDEF USEINLINE}inline;{$ENDIF}
   protected
     procedure BeginRoot; override;
     procedure EndRoot; override;
@@ -1806,7 +1830,7 @@ begin
 end;
 
 {$IFNDEF USEYxdStr}
-function IsHexChar(c: JSONChar): Boolean; inline;
+function IsHexChar(c: JSONChar): Boolean; {$IFDEF USEINLINE}inline;{$ENDIF}
 begin
   Result:=((c>='0') and (c<='9')) or
     ((c>='a') and (c<='f')) or
@@ -3422,12 +3446,12 @@ begin
 end;
 {$ENDIF}
 
-function BoolToStr(const v: Boolean): JSONString; inline;
+function BoolToStr(const v: Boolean): JSONString; {$IFDEF USEINLINE}inline;{$ENDIF}
 begin
   if v then Result := 'true' else Result := 'false';
 end;
 
-function FloatToStr(const value: Extended): string; inline;
+function FloatToStr(const value: Extended): string; {$IFDEF USEINLINE}inline;{$ENDIF}
 var
   Buffer: array[0..63] of Char;
   P: PChar;
@@ -5082,7 +5106,7 @@ begin
 end;
 {$ENDIF}
 
-function JSONBase.GetPath: JSONString;
+function JSONBase.GetPathPro: JSONString;
 begin
   Result := GetPath('\');
 end;
@@ -5262,6 +5286,14 @@ begin
   L := FDest - PJSONChar(FValue);
   SetLength(Result, L);
   Move(FStart^, PJSONChar(Result)^, L{$IFDEF JSON_UNICODE} shl 1{$ENDIF});
+end;
+
+function TStringCatHelper.GetLast: PJSONChar;
+begin
+  if FDest > FStart then
+    Result := FDest - 1
+  else
+    Result := nil;
 end;
 
 procedure TStringCatHelper.NeedSize(ASize: Integer);
