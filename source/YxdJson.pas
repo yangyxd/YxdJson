@@ -565,8 +565,10 @@ type
     /// <summary>
     /// 序列化
     /// </summary>
+    {$IFDEF USERTTI}
     class function Serialize(ASource: TObject): JSONString; overload;
     class function Serialize(ASource: Pointer; AType: PTypeInfo): JSONString; overload;
+    {$ENDIF}
     {$IFDEF USEDBRTTI}
     class function Serialize(ADataSet: TDataSet; const PageIndex: Integer = 0;
       const PageSize: Integer = 0; Base64Blob: Boolean = True): JSONString; overload;
@@ -1033,6 +1035,7 @@ const
   CharCode:         PJSONChar = '\u00';
   CharEscape:       PJSONChar = '\u';
 
+{$IFDEF USERTTI}
 type
   TJsonSerializeWriter = class(TSerializeWriter)
   private
@@ -1072,6 +1075,7 @@ type
     function IsArray: Boolean; override;
     property DoEscape: Boolean read FDoEscape write FDoEscape;
   end;
+{$ENDIF}
 
 {$IFNDEF USEYxdStr}
 //计算当前字符的长度
@@ -4945,6 +4949,7 @@ begin
   SaveToStream(AStream, AIndent, {$IFDEF JSON_UNICODE}teUTF8{$ELSE}teAnsi{$ENDIF}, False);
 end;
 
+{$IFDEF USERTTI}
 class function JSONBase.Serialize(ASource: TObject): JSONString;
 var
   Writer: TSerializeWriter; 
@@ -4970,6 +4975,7 @@ begin
     FreeAndNil(Writer);
   end;
 end;
+{$ENDIF}
 
 {$IFDEF USEDBRTTI}
 class function JSONBase.Serialize(ADataSet: TDataSet;
@@ -6423,6 +6429,7 @@ end;
 
 { TJsonSerializeWriter }
 
+{$IFDEF USERTTI}
 procedure TJsonSerializeWriter.AddInt64(const Value: Int64);
 begin
   FData.Cat(IntToStr(Value)).Cat(',');
@@ -6652,6 +6659,7 @@ begin
     end;
   end;
 end;
+{$ENDIF}
 
 initialization
 
