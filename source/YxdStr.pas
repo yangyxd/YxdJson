@@ -1078,7 +1078,7 @@ begin
                Rp^ := CA_PerCent
              else begin
                HB := H_BYTE[Byte(Sp^)];
-               if HB <> 0 then
+               if HB <> -1 then
                 LB := L_BYTE[Byte(PCharA(IntPtr(Sp)+1)^)];
                if (HB <> -1) and (LB <> -1) then begin
                  Rp^ := AnsiChar(HB + LB);
