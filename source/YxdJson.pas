@@ -104,14 +104,9 @@ interface
   {$DEFINE JSON_SUPPORT}
 {$endif}
 
-// D2006
-{$if CompilerVersion >= 18.0}         // bds 2006
-{$DEFINE USEINLINE}
-{$else}
-{$IFNDEF Version7}
-{$DEFINE USEINLINE}
-{$ENDIF}
-{$ifend}
+{$IF defined(FPC) or defined(VER170) or defined(VER180) or defined(VER190) or defined(VER200) or defined(VER210)}
+  {$DEFINE USEINLINE}
+{$IFEND}
 
 (* 功能可选项条件编译 *)
 {$DEFINE USEYxdStr}     // 是否使用YxdStr单元
