@@ -14,18 +14,16 @@ interface
 {$LEGACYIFEND ON}
 {$IFEND}
 
+{$IF defined(FPC)}
+  {$DEFINE USEINLINE}
+{$IFEND}
+{$IF RTLVersion>=18}
+  {$DEFINE USEINLINE}
+{$IFEND}
+
 {$ifdef VER150}
   {$define Version7}
 {$endif}
-
-// D2006
-{$if CompilerVersion >= 18.0}         // bds 2006
-{$DEFINE USEINLINE}
-{$else}
-{$IFNDEF Version7}
-{$DEFINE USEINLINE}
-{$ENDIF}
-{$ifend}
 
 // 是否使用URL函数
 {$DEFINE USE_URLFUNC}
@@ -36,9 +34,6 @@ interface
 {$IF (RTLVersion>=26)}
 {$DEFINE USE_UNICODE}
 {$IFEND}
-
-//是否使用Inline
-{$DEFINE INLINE}
 
 {$IF (RTLVersion>=26) and (not Defined(NEXTGEN))}
 {$DEFINE ANSISTRINGS}

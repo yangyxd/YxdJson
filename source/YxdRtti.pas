@@ -50,7 +50,12 @@ interface
 
 {$IF RTLVersion>=26}
 {$DEFINE USE_UNICODE}
+{$IFEND}
+
+{$IF RTLVersion>=10}
+{$IFNDEF VER150}
 {$DEFINE USEDataSet}              // 是否使用DataSet序列化功能
+{$ENDIF}
 {$IFEND}
 
 uses
@@ -140,7 +145,11 @@ type
     procedure WriteBoolean(const Name: string; const Value: Boolean); virtual; abstract;
     procedure WriteFloat(const Name: string; const Value: Double); overload; virtual; abstract;
     procedure WriteVariant(const Name: string; const Value: Variant); overload; virtual; abstract;
+
+    procedure WriteNull(const Name: string); virtual; abstract;
   public
+    procedure SaveToFile(const AFileName: string); 
+    function SaveToStream(AStream: TStream): Integer; virtual;
     {$IFNDEF USE_UNICODE}
     function ToString(): string; virtual;
     {$ENDIF}
@@ -165,6 +174,7 @@ type
     {$IFDEF USE_UNICODE}
     class procedure Serialize(Writer: TSerializeWriter; const Key: string; AInstance: TValue); overload;
     {$ENDIF}
+    class procedure Serialize(Writer: TSerializeWriter; AJson: JSONBase); overload;
 
     class procedure ReadValue(AIn: JSONBase; ADest: Pointer; aType: {$IFDEF USE_UNICODE}PTypeInfo{$ELSE}PTypeInfo{$ENDIF}); overload;
     {$IFDEF USEDataSet}
@@ -204,6 +214,52 @@ type
     {$ENDIF}
   end;
 
+type
+  /// <summary>
+  /// MsgPack 序列化写入器
+  /// </summary>
+  TMsgPackSerializeWriter = class(TSerializeWriter)
+  private
+    FData: TMemoryStream;
+    FIsArray: Boolean;
+    FDoEscape: Boolean;
+    procedure WriteName(const Name: string); {$IFDEF USEINLINE}inline;{$ENDIF}
+  protected
+    procedure BeginRoot; override;
+    procedure EndRoot; override;
+
+    procedure BeginData(const Name: string; const IsArray: Boolean); override;
+    procedure EndData(); override;
+
+    procedure Add(const Value: string); overload; override;
+    procedure Add(const Value: Integer); overload; override;
+    procedure Add(const Value: Cardinal); overload; override;
+    procedure Add(const Value: Double); overload; override;
+    procedure Add(const Value: Boolean); overload; override;
+    procedure Add(const Value: Variant); overload; override;
+    procedure AddTime(const Value: TDateTime); overload; override;
+    procedure AddInt64(const Value: Int64); overload; override;
+
+    procedure WriteString(const Name, Value: string); override;
+    procedure WriteInt(const Name: string; const Value: Integer); override;
+    procedure WriteInt64(const Name: string; const Value: Int64); override;
+    procedure WriteUInt(const Name: string; const Value: Cardinal); override;
+    procedure WriteDateTime(const Name: string; const Value: TDateTime); override;
+    procedure WriteBoolean(const Name: string; const Value: Boolean); override;
+    procedure WriteFloat(const Name: string; const Value: Double); override;
+    procedure WriteVariant(const Name: string; const Value: Variant); override;
+
+    procedure WriteNull(const Name: string); override;
+  public
+    constructor Create;
+    destructor Destroy; override;
+
+    function SaveToStream(AStream: TStream): Integer; override;
+    function ToString(): string; override;
+    function IsArray: Boolean; override;
+    property DoEscape: Boolean read FDoEscape write FDoEscape;
+  end;
+
 implementation
 
 {$IFDEF USEDataSet}
@@ -222,6 +278,7 @@ resourcestring
   SMissRttiTypeDefine = '无法找到 %s 的RTTI类型信息，尝试将对应的类型单独定义(如array[0..1] of Byte改为TByteArr=array[0..1]，然后用TByteArr声明)。';
   SArrayTypeMissed = '未知的数组元素类型.';
   SErrorJsonType = '错误的Json类型.';
+  SObjectChildNeedName = '对象 %s 的第 %d 个子结点名称未赋值, 编码输出前必需赋值.';
 
 { FiledNameAttribute }
 
@@ -392,13 +449,48 @@ begin
   FStack := AItem;
 end;
 
-{$IFNDEF USE_UNICODE}
-
+{$IFNDEF USE_UNICODE} 
 function TSerializeWriter.ToString: string;
 begin
   Result := Self.ClassName;
 end;
 {$ENDIF}
+
+procedure TSerializeWriter.SaveToFile(const AFileName: string);
+var
+  Stream: TFileStream;
+begin
+  Stream := TFileStream.Create(AFileName, fmCreate);
+  try
+    SaveToStream(Stream);  
+  finally
+    FreeAndNil(Stream);
+  end;
+end;
+
+function TSerializeWriter.SaveToStream(AStream: TStream): Integer; 
+var
+  Data: string;
+  {$IFDEF UNICODE}
+  UData: AnsiString;
+  {$ENDIF}
+begin
+  if not Assigned(AStream) then
+    raise Exception.Create('参数 Stream 为空');
+  Data := ToString;
+  if Length(Data) > 0 then begin
+    {$IFDEF UNICODE}
+    UData := {$IFDEF USEYxdStr}YxdStr{$ELSE}YxdJson{$ENDIF}.Utf8Encode(Data);
+    Result := {$IFDEF NEXTGEN}UData.Length{$ELSE}Length(UData){$ENDIF};
+    if Result > 0 then
+      AStream.WriteBuffer(PAnsiChar(UData)^, Result);
+    {$ELSE}
+    Result := Length(Data) {$IFDEF UNICODE} shl 1 {$ENDIF};
+    AStream.WriteBuffer(PChar(Data)^, Result);
+    {$ENDIF}
+  end else
+    Result := 0;
+end;
 
 { TYxdSerialize }
 
@@ -630,7 +722,7 @@ class procedure TYxdSerialize.Serialize(Writer: TSerializeWriter; const Key: str
             end;
           tkVariant:
             begin                
-              Writer.WriteVariant(AName, GetPropValue(AObj,APropList[J].Name));
+              Writer.WriteVariant(AName, GetPropValue(AObj, string(APropList[J].Name)));
             end;
           tkInt64:
             Writer.WriteInt64(AName, GetInt64Prop(AObj,APropList[J]));
@@ -711,6 +803,78 @@ begin
   {$ELSE}
   Serialize(Writer, Key, TValue(ASource));
   {$ENDIF}
+end;
+
+class procedure TYxdSerialize.Serialize(Writer: TSerializeWriter; AJson: JSONBase);
+
+  procedure DoSerialize(Writer: TSerializeWriter; AJson: JSONBase);
+  var
+    I: Integer;
+    Item: PJSONValue;
+    IsArray: Boolean;
+  begin
+    if not Assigned(AJson) then
+      Exit;
+    if AJson.Count > 0 then begin
+      IsArray := AJson.IsJSONArray;
+      Writer.BeginData(AJson.Name, IsArray);
+
+      for I := 0 to AJson.Count - 1 do begin
+        Item := AJson.Items[I];
+        if Item = nil then Continue;
+        case Item.FType of
+          jdtObject:
+            begin
+              if Item.GetObject <> nil then begin
+                if not Item.GetObject.IsJSONArray then begin
+                  if (not IsArray) and (Length(Item.FName) = 0) then
+                    raise Exception.CreateFmt(SObjectChildNeedName, [Item.FName, I]);
+                end;
+                DoSerialize(Writer, Item.GetObject);
+              end;
+            end;
+          jdtString:
+            begin
+              Writer.WriteString(Item.FName, Item.AsString);
+            end;
+          jdtInteger:
+            begin
+              Writer.WriteInt(Item.FName, Item.AsInteger);
+            end;
+          jdtFloat:
+            begin
+              Writer.WriteFloat(Item.FName, Item.AsFloat);
+            end;
+          jdtBoolean:
+            begin
+              Writer.WriteBoolean(Item.FName, Item.AsBoolean);
+            end;
+          jdtDateTime:
+            begin
+              if StrictJson then
+                Writer.WriteDateTime(Item.FName, Item.AsDateTime)
+              else
+                Writer.WriteString(Item.FName, Item.ToString)
+            end;
+          jdtNull, jdtUnknown:
+            Writer.WriteNull(Item.FName);
+        else
+          Writer.WriteNull(Item.FName);
+        end;
+      end;
+      Writer.EndData;
+    end else begin
+      Writer.BeginData(AJson.Name, AJson.IsJSONArray);
+      Writer.EndData;
+    end;
+  end;
+
+begin
+  if not Assigned(AJson) then
+    Exit;
+  Writer.BeginRoot;
+  DoSerialize(Writer, AJson);
+  Writer.EndRoot;
 end;
 
 {$IFDEF USE_UNICODE}
@@ -2415,7 +2579,7 @@ class procedure TYxdSerialize.writeValue(aOut: JSONBase; const key: JSONString; 
                 JSONObject(aOut).put(AName, GetSetProp(AObj,APropList[J],True));
             end;
           tkVariant:
-            JSONObject(aOut).put(AName, GetPropValue(AObj,APropList[J].Name));
+            JSONObject(aOut).put(AName, GetPropValue(AObj, string(APropList[J].Name)));
           tkInt64:
             JSONObject(aOut).put(AName, GetInt64Prop(AObj,APropList[J]));
           tkRecord, tkArray, tkDynArray://记录、数组、动态数组属性系统也不保存，也没提供所有太好的接口
@@ -2530,6 +2694,154 @@ begin
   end;
 end;
 {$ENDIF} 
+
+{ TMsgPackSerializeWriter }
+
+procedure TMsgPackSerializeWriter.Add(const Value: Boolean);
+begin
+
+end;
+
+procedure TMsgPackSerializeWriter.Add(const Value: Variant);
+begin
+
+end;
+
+procedure TMsgPackSerializeWriter.Add(const Value: Cardinal);
+begin
+
+end;
+
+procedure TMsgPackSerializeWriter.Add(const Value: Double);
+begin
+
+end;
+
+procedure TMsgPackSerializeWriter.Add(const Value: Integer);
+begin
+
+end;
+
+procedure TMsgPackSerializeWriter.Add(const Value: string);
+begin
+
+end;
+
+procedure TMsgPackSerializeWriter.AddInt64(const Value: Int64);
+begin
+
+end;
+
+procedure TMsgPackSerializeWriter.AddTime(const Value: TDateTime);
+begin
+
+end;
+
+procedure TMsgPackSerializeWriter.BeginData(const Name: string;
+  const IsArray: Boolean);
+begin
+
+end;
+
+procedure TMsgPackSerializeWriter.BeginRoot;
+begin
+
+end;
+
+constructor TMsgPackSerializeWriter.Create;
+begin
+  FData := TMemoryStream.Create;
+  FData.Size := 16384; // 16K
+  FDoEscape := True;
+end;
+
+destructor TMsgPackSerializeWriter.Destroy;
+begin
+  FreeAndNil(FData);
+  inherited;
+end;
+
+procedure TMsgPackSerializeWriter.EndData;
+begin
+
+end;
+
+procedure TMsgPackSerializeWriter.EndRoot;
+begin
+
+end;
+
+function TMsgPackSerializeWriter.IsArray: Boolean;
+begin
+
+end;
+
+function TMsgPackSerializeWriter.SaveToStream(AStream: TStream): Integer;
+begin
+  
+end;
+
+function TMsgPackSerializeWriter.ToString: string;
+begin
+
+end;
+
+procedure TMsgPackSerializeWriter.WriteBoolean(const Name: string;
+  const Value: Boolean);
+begin
+
+end;
+
+procedure TMsgPackSerializeWriter.WriteDateTime(const Name: string;
+  const Value: TDateTime);
+begin
+
+end;
+
+procedure TMsgPackSerializeWriter.WriteFloat(const Name: string;
+  const Value: Double);
+begin
+
+end;
+
+procedure TMsgPackSerializeWriter.WriteInt(const Name: string;
+  const Value: Integer);
+begin
+
+end;
+
+procedure TMsgPackSerializeWriter.WriteInt64(const Name: string;
+  const Value: Int64);
+begin
+
+end;
+
+procedure TMsgPackSerializeWriter.WriteName(const Name: string);
+begin
+
+end;
+
+procedure TMsgPackSerializeWriter.WriteNull(const Name: string);
+begin
+
+end;
+
+procedure TMsgPackSerializeWriter.WriteString(const Name, Value: string);
+begin
+
+end;
+
+procedure TMsgPackSerializeWriter.WriteUInt(const Name: string;
+  const Value: Cardinal);
+begin
+
+end;
+
+procedure TMsgPackSerializeWriter.WriteVariant(const Name: string;
+  const Value: Variant);
+begin
+
+end;
 
 initialization
   {$IFDEF USEDataSet}

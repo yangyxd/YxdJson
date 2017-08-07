@@ -99,23 +99,29 @@ interface
 {$LEGACYIFEND ON}
 {$IFEND}
 
+{$IF defined(FPC)}
+  {$DEFINE USEINLINE}
+{$IFEND}
+{$IF RTLVersion>=18}
+  {$DEFINE USEINLINE}
+{$IFEND}
+
 {$ifdef VER150}
   {$define Version7}
   {$DEFINE JSON_SUPPORT}
-{$endif}
-
-{$IF defined(FPC) or defined(VER170) or defined(VER180) or defined(VER190) or defined(VER200) or defined(VER210)}
-  {$DEFINE USEINLINE}
-{$IFEND}
+{$endif}  
 
 (* 功能可选项条件编译 *)
 {$DEFINE USEYxdStr}     // 是否使用YxdStr单元
 {$DEFINE USERTTI}       // 是否使用RTTI功能
-{.$DEFINE USERegEx}      // 是否使用正则表达式搜索功能，D2010之前版本需要引用相关单元
+{$DEFINE USERegEx}      // 是否使用正则表达式搜索功能，D2010之前版本需要引用相关单元
+
 {$IFDEF USERTTI}
-  {$IFNDEF Version7}
-  {$DEFINE USEDBRTTI}    // 是否使用DataSet序列化功能，必须先启用USERTTI
+  {$IF RTLVersion>=10}
+  {$IFNDEF VER150}
+    {$DEFINE USEDBRTTI}    // 是否使用DataSet序列化功能，必须先启用USERTTI
   {$ENDIF}
+  {$IFEND}
 {$ENDIF}
 
 (* Delphi 版本控制条件编译 *)
@@ -447,7 +453,6 @@ type
     function GetEnumerator: JSONEnumerator;
     /// <summary>获取当前节点的路径</summary>
     function GetPath(const ADelimiter: JSONChar = '\'): JSONString; overload;
-
     /// <summary>编码JSON对象为字符串, 与toString相同</summary>
     /// <param name="AIndent">缩进单位大小</param>
     /// <param name="ADoEscape">是否转义非字母和数字字符</param>
@@ -563,6 +568,7 @@ type
     {$IFDEF USERTTI}
     class function Serialize(ASource: TObject): JSONString; overload;
     class function Serialize(ASource: Pointer; AType: PTypeInfo): JSONString; overload;
+    class function GetSerializeWriter(): TObject;
     {$ENDIF}
     {$IFDEF USEDBRTTI}
     class function Serialize(ADataSet: TDataSet; const PageIndex: Integer = 0;
@@ -1062,6 +1068,8 @@ type
     procedure WriteBoolean(const Name: string; const Value: Boolean); override;
     procedure WriteFloat(const Name: string; const Value: Double); override;
     procedure WriteVariant(const Name: string; const Value: Variant); override;
+
+    procedure WriteNull(const Name: string); override;
   public
     constructor Create;
     destructor Destroy; override;
@@ -4970,6 +4978,11 @@ begin
     FreeAndNil(Writer);
   end;
 end;
+
+class function JSONBase.GetSerializeWriter(): TObject;
+begin
+  Result := TJsonSerializeWriter.Create();
+end;
 {$ENDIF}
 
 {$IFDEF USEDBRTTI}
@@ -6545,6 +6558,12 @@ end;
 
 procedure TJsonSerializeWriter.EndRoot;
 begin
+  if (FData.Position = 0) then begin
+    if FIsArray then
+      FData.Cat('[]')
+    else
+      FData.Cat('{}');
+  end;
 end;
 
 function TJsonSerializeWriter.IsArray: Boolean;
@@ -6601,6 +6620,12 @@ procedure TJsonSerializeWriter.WriteName(const Name: string);
 begin
   if FIsArray then Exit;
   FData.Cat('"').Cat(Name).Cat('":');
+end;
+
+procedure TJsonSerializeWriter.WriteNull(const Name: string);
+begin
+  WriteName(Name);
+  FData.Cat(CharNull);
 end;
 
 procedure TJsonSerializeWriter.WriteString(const Name, Value: string);
