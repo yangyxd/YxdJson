@@ -17,6 +17,11 @@
  --------------------------------------------------------------------
   更新记录
  --------------------------------------------------------------------
+ ver 1.0.18 2017.08.30
+ --------------------------------------------------------------------
+  + 增加 GetStringEx 函数
+  
+ --------------------------------------------------------------------
  ver 1.0.17 2017.06.06
  --------------------------------------------------------------------
   + 增加 Delphi 7 支持
@@ -317,6 +322,7 @@ type
     function GetPath(const ADelimiter: JSONChar = '.'): JSONString;
     function GetObject: JSONBase;
     function GetString: string;
+    function GetStringEx(AEncoding: TTextEncoding = teUnknown): string;
     {$IFDEF JSON_RTTI}
     // 将当前json数据转换为TValue类型的值
     function ToObjectValue: TValue;
@@ -1079,6 +1085,30 @@ type
     property DoEscape: Boolean read FDoEscape write FDoEscape;
   end;
 {$ENDIF}
+
+type
+  TPointerStream = class(TCustomMemoryStream)
+  public
+    constructor Create; overload;
+    constructor Create(const Ptr: Pointer; ASize: Integer); overload;
+    function Write(const Buffer; Count: Longint): Longint; override;
+  end;
+
+constructor TPointerStream.Create;
+begin
+  inherited Create;
+end;
+
+constructor TPointerStream.Create(const Ptr: Pointer; ASize: Integer);
+begin
+  inherited Create;
+  SetPointer(Ptr, ASize);
+end;
+
+function TPointerStream.Write(const Buffer; Count: Integer): Longint;
+begin
+  raise Exception.Create('PointerStream Ban Written.');
+end;
 
 {$IFNDEF USEYxdStr}
 //计算当前字符的长度
@@ -3240,6 +3270,22 @@ end;
 function JSONValue.GetAsString: JSONString;
 begin
   Result := ToString();
+end;
+
+function JSONValue.GetStringEx(AEncoding: TTextEncoding): string;
+var
+  Stream: TPointerStream;
+begin
+  if Length(FValue) = 0 then
+    Result := ''
+  else begin
+    Stream := TPointerStream.Create(@FValue[0], Length(FValue));
+    try
+      Result := LoadTextA(Stream, AEncoding);
+    finally
+      FreeAndNil(Stream);
+    end;
+  end;
 end;
 
 function JSONValue.GetAsVariant: Variant;
