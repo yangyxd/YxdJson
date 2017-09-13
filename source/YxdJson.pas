@@ -317,6 +317,8 @@ type
     FNameHash: Cardinal;
     FValue: TBytes;
 
+    procedure Clear();
+
     function ToString: JSONString; overload;
     function ToString(AIndent: Integer; ADoEscape: Boolean = False): JSONString; overload;
     function GetPath(const ADelimiter: JSONChar = '.'): JSONString;
@@ -3558,6 +3560,16 @@ end;
 function JSONValue.ToString: JSONString;
 begin
   Result := ToString(0);
+end;
+
+procedure JSONValue.Clear();
+begin
+  Free();
+  FType := jdtUnknown;
+  FName := '';
+  FNameHash := 0;
+  SetLength(FValue, 0);
+  FObject := nil;
 end;
 
 { JSONEnumerator }
