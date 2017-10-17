@@ -17,6 +17,10 @@
  --------------------------------------------------------------------
   更新记录
  --------------------------------------------------------------------
+ ver 1.0.19 2017.10.17
+ --------------------------------------------------------------------
+  * 同步 qjson 修复ParseJsonTime函数bug
+  
  ver 1.0.18 2017.08.30
  --------------------------------------------------------------------
   + 增加 GetStringEx 函数
@@ -232,6 +236,9 @@ type
 type
   JSONDataType = (jdtUnknown, jdtNull, jdtString, jdtInteger, jdtFloat,
     jdtBoolean, jdtDateTime, jdtObject);
+
+type
+  TJsonDatePrecision = (jdpMillisecond, jdpSecond);
 
 {$IFNDEF USEYxdStr}
 type
@@ -866,7 +873,9 @@ const
   JsonDateTimeFormat: JSONString = 'yyyy-mm-dd hh:nn:ss.zzz';
   //浮点数精度
   JsonFloatDigits: Integer = 6;
-
+  //Json 严格模式下日期类型的精度，默认为毫秒，可以设置为秒以便与某些系统兼容
+  JsonDatePrecision: TJsonDatePrecision = jdpMillisecond;
+  
 var
   // 是否启用严格检查模式，在严格模式下：
   // 1.名称或字符串必需使用双引号包含起来,如果为False，则名称可以没有引号或使用单引号。
@@ -2284,12 +2293,14 @@ begin
 end;
 
 function ParseJsonTime(p: PJSONChar; var ATime: TDateTime): Boolean;
+const
+  UnixDelta: Int64 = 25569;
 var
   MS, TimeZone: Int64;
 begin
   // Javascript日期格式为/DATE(自1970.1.1起到现在的毫秒数+时区)/
   Result := False;
-  if not StartWith(p, '/DATE', False) then
+  if not StartWith(p, '/DATE', True) then
     Exit;
   Inc(p, 5);
   {$IFDEF JSON_UNICODE}SkipSpaceW{$ELSE}SkipSpaceA{$ENDIF}(p);
@@ -2307,7 +2318,10 @@ begin
   end else
     TimeZone := 0;
   if p^ = ')' then begin
-    ATime := (MS div 86400000) + ((MS mod 86400000) / 86400000.0);
+    if (MS > 10000000000) or (JsonDatePrecision = jdpMillisecond) then
+      ATime := UnixDelta + (MS div 86400000) + ((MS mod 86400000) / 86400000)
+    else
+      ATime := UnixDelta + (MS div 86400) + ((MS mod 86400) / 86400);
     if TimeZone <> 0 then
       ATime := IncHour(ATime, -TimeZone);
     Inc(p);
