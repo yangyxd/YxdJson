@@ -3165,11 +3165,24 @@ begin
     FObject.Free;
 end;
 
+function _StrToBoolDef(const Value: string): Boolean;
+begin
+  Result := (Value = 'true') or (Value = 'yes') or (Value = '1');
+end;
+
 function JSONValue.GetAsBoolean: Boolean;
 begin
-  if High(FValue) > -1 then
-    Result := PBoolean(@FValue[0])^
-  else Result := False;
+  if High(FValue) > -1 then begin
+    case FType of
+      jdtNull: Result := False;
+      jdtString: Result := _StrToBoolDef(LowerCase(AsString));
+      jdtInteger: Result := AsInt64 <> 0;
+      jdtObject: Result := FObject <> nil;
+      jdtFloat, jdtDateTime: Result := AsFloat <> 0;
+    else
+      Result := PBoolean(@FValue[0])^;
+    end;
+  end else Result := False;
 end;
 
 function JSONValue.GetAsByte: Byte;
