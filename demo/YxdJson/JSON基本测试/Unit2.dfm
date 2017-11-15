@@ -22,7 +22,7 @@ object Form2: TForm2
     Top = 208
     Width = 923
     Height = 292
-    ActivePage = TabSheet2
+    ActivePage = TabSheet1
     Anchors = [akLeft, akTop, akRight, akBottom]
     TabOrder = 0
     object TabSheet1: TTabSheet
@@ -90,8 +90,6 @@ object Form2: TForm2
         Align = alClient
         ScrollBars = ssBoth
         TabOrder = 0
-        ExplicitLeft = 51
-        ExplicitTop = 0
       end
       object Memo4: TMemo
         Left = 584
@@ -269,6 +267,33 @@ object Form2: TForm2
     Caption = 'SuperJson'#29992#27861#27979#35797
     TabOrder = 16
     OnClick = Button18Click
+  end
+  object Button13: TButton
+    Left = 588
+    Top = 8
+    Width = 75
+    Height = 25
+    Caption = 'Button13'
+    TabOrder = 17
+    OnClick = Button13Click
+  end
+  object CheckBox3: TCheckBox
+    Left = 544
+    Top = 105
+    Width = 97
+    Height = 17
+    Caption = 'JSON Time'
+    TabOrder = 18
+    OnClick = CheckBox3Click
+  end
+  object Button14: TButton
+    Left = 352
+    Top = 101
+    Width = 177
+    Height = 25
+    Caption = 'Json Time '#26684#24335#21270#36755#20986
+    TabOrder = 19
+    OnClick = Button14Click
   end
   object PopupMenu1: TPopupMenu
     Left = 520

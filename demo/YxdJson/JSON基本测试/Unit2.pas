@@ -41,6 +41,9 @@ type
     Button18: TButton;
     Memo3: TMemo;
     Memo4: TMemo;
+    Button13: TButton;
+    CheckBox3: TCheckBox;
+    Button14: TButton;
     procedure Button1Click(Sender: TObject);
     procedure Button3Click(Sender: TObject);
     procedure Button2Click(Sender: TObject);
@@ -58,6 +61,9 @@ type
     procedure Button16Click(Sender: TObject);
     procedure Button17Click(Sender: TObject);
     procedure Button18Click(Sender: TObject);
+    procedure Button13Click(Sender: TObject);
+    procedure CheckBox3Click(Sender: TObject);
+    procedure Button14Click(Sender: TObject);
   private
     { Private declarations }
   public
@@ -132,6 +138,29 @@ begin
   end;
 end;
 
+procedure TForm2.Button13Click(Sender: TObject);
+var
+  json: YxdJson.Jsonbase;
+begin
+  json := YxdJson.Jsonbase.Parser(Memo1.Text);
+  try
+    Memo2.Text := json.toString(4);
+    Memo2.Lines.Add(FormatDateTime('yyyy-mm-dd hh:nn:ss.zzz', json.Items[0].AsJsonObject.GetDateTime('FEnterDateTime')));
+  finally
+    json.Free;
+  end;
+end;
+
+procedure TForm2.Button14Click(Sender: TObject);
+var
+  json: JSONObject;
+begin
+  json := JSONObject.Create;
+  json.PutDateTime('Time', Now);
+  Memo2.Text := json.ToString(4);
+  json.Free;
+end;
+
 procedure TForm2.Button16Click(Sender: TObject);
 var
   json: JSONObject;
@@ -177,9 +206,9 @@ end;
 
 procedure TForm2.Button1Click(Sender: TObject);
 var
-  json: YxdJson.JSONObject;
+  json: YxdJson.JSONBase;
 begin
-  json := YxdJson.JSONObject.parseObject(Memo1.Text);
+  json := YxdJson.JSONBase.Parser(Memo1.Text);
   try
     Memo2.Text := json.toString();   
     //ShowMessage(json[Edit1.Text].AsString);
@@ -224,9 +253,9 @@ end;
 
 procedure TForm2.Button3Click(Sender: TObject);
 var
-  json: YxdJson.JSONObject;
+  json: YxdJson.Jsonbase;
 begin
-  json := YxdJson.JSONObject.parseObject(Memo1.Text);
+  json := YxdJson.Jsonbase.Parser(Memo1.Text);
   try
     Memo2.Text := json.toString(4);
   finally
@@ -416,6 +445,14 @@ begin
   t := GetTickCount - t;
   ListBox1.Items.add(Format('QJson 加载用时%dms, 保存用时%dms, 共计%dms', [t1, t2, t]));
   if CheckBox2.Checked then Memo2.Text := v;     
+end;
+
+procedure TForm2.CheckBox3Click(Sender: TObject);
+begin
+  if CheckBox3.Checked then
+    JsonDateFormatStyle := jdsJsonTime
+  else
+    JsonDateFormatStyle := jdsNormal;
 end;
 
 procedure TForm2.FormCreate(Sender: TObject);

@@ -66,7 +66,7 @@ uses
   {$IF CompilerVersion > 27}System.NetEncoding, {$IFEND}
   {$IFDEF USEDataSet}DB, DBClient, {$ENDIF}
   {$IFDEF USEJsonSerialize}YxdJson, {$ENDIF}   
-  SysUtils, Classes, Variants, TypInfo, Math;
+  SysUtils, Classes, Variants, TypInfo, Math, DateUtils;
 
 type
   /// <summary>
@@ -223,8 +223,9 @@ type
     FData: TMemoryStream;
     FIsArray: Boolean;
     FDoEscape: Boolean;
-    procedure WriteName(const Name: string); {$IFDEF USEINLINE}inline;{$ENDIF}
   protected
+    procedure WriteName(const Name: string); {$IFDEF USEINLINE}inline;{$ENDIF}
+    
     procedure BeginRoot; override;
     procedure EndRoot; override;
 
@@ -1543,7 +1544,7 @@ class procedure TYxdSerialize.ReadValue(AIn: TDataSet; ADest: Pointer;
                 (AFieldItem.FieldType.Handle = TypeInfo(TTime)) or
                 (AFieldItem.FieldType.Handle = TypeInfo(TDate))
               then begin
-                if AChild.DataType in [ftString, ftWideString] then begin                  
+                if AChild.DataType in [ftString, ftWideString] then begin
                   AFieldItem.SetValue(ABaseAddr, StrToDateTimeDef(AChild.AsString, 0))
                 end else
                   AFieldItem.SetValue(ABaseAddr, AChild.AsDateTime)
@@ -1777,8 +1778,44 @@ class procedure TYxdSerialize.readValue(aIn: JSONBase; aDest: Pointer;
               if (AFieldItem.FieldType.Handle = TypeInfo(TDateTime)) or
                 (AFieldItem.FieldType.Handle = TypeInfo(TTime)) or
                 (AFieldItem.FieldType.Handle = TypeInfo(TDate))
-                 then
-                 AFieldItem.SetValue(ABaseAddr, AChild.TryAsDatetime)
+              then
+                if AChild.FType in [jdtNull, jdtUnknown] then
+                  AFieldItem.SetValue(ABaseAddr, 0)
+                else if AChild.FType = jdtInteger then begin
+                  case JsonIntToTimeStyle of
+                    tsDeny:
+                      raise Exception.CreateFmt(SBadConvert, [Achild.AsString, JsonTypeName[Ord(jdtDateTime)]]);
+                    tsSecondsFrom1970: //unix
+                      begin
+                        if (JsonTimeZone >= -12) and (JsonTimeZone <= 12) then
+                          AFieldItem.SetValue(ABaseAddr, IncHour(UnixToDateTime(AChild.AsInt64), JsonTimeZone))
+                        else
+                          AFieldItem.SetValue(ABaseAddr, UnixToDateTime(AChild.AsInt64));
+                      end;
+                    tsSecondsFrom1899:
+                      begin
+                        if (JsonTimeZone >= -12) and (JsonTimeZone <= 12) then
+                          AFieldItem.SetValue(ABaseAddr, IncHour(AChild.AsInt64 / 86400, JsonTimeZone))
+                        else
+                          AFieldItem.SetValue(ABaseAddr, AChild.AsInt64 / 86400);
+                      end;
+                    tsMsFrom1970:
+                      begin
+                        if (JsonTimeZone >= -12) and (JsonTimeZone <= 12) then
+                          AFieldItem.SetValue(ABaseAddr, IncHour(IncMilliSecond(UnixDateDelta, AChild.AsInt64), JsonTimeZone))
+                        else
+                          AFieldItem.SetValue(ABaseAddr, IncMilliSecond(UnixDateDelta, AChild.AsInt64));
+                      end;
+                    tsMsFrom1899:
+                      begin
+                        if (JsonTimeZone >= -12) and (JsonTimeZone <= 12) then
+                          AFieldItem.SetValue(ABaseAddr, IncHour(AChild.AsInt64 / 86400000, JsonTimeZone))
+                        else
+                          AFieldItem.SetValue(ABaseAddr, AChild.AsInt64 / 86400000);
+                      end;
+                  end;
+                end else
+                  AFieldItem.SetValue(ABaseAddr, AChild.TryAsDatetime)
               else
                 AFieldItem.SetValue(ABaseAddr, AChild.AsFloat);
             tkInt64:
@@ -2773,12 +2810,12 @@ end;
 
 function TMsgPackSerializeWriter.IsArray: Boolean;
 begin
-
+  Result := FIsArray;
 end;
 
 function TMsgPackSerializeWriter.SaveToStream(AStream: TStream): Integer;
 begin
-  
+  Result := 0;
 end;
 
 function TMsgPackSerializeWriter.ToString: string;

@@ -17,6 +17,11 @@
  --------------------------------------------------------------------
   更新记录
  --------------------------------------------------------------------
+ ver 1.0.20 2017.11.15
+ --------------------------------------------------------------------
+  * 优化日期时间解析和RTTI转换，增加时区设置功能
+  
+ --------------------------------------------------------------------
  ver 1.0.19 2017.10.17
  --------------------------------------------------------------------
   * 同步 qjson 修复ParseJsonTime函数bug
@@ -239,7 +244,14 @@ type
 
 type
   TJsonDatePrecision = (jdpMillisecond, jdpSecond);
-
+  // 日期时间格式化样式
+  TJsonDateFormatStyle = (
+    jdsNormal {传统的输出方式，根据JsonDateTimeFormat等设置来输出字符串},
+    jdsJsonTime {JSON标准时间戳输出方式}
+  );
+  TJsonIntToTimeStyle = (tsDeny, tsSecondsFrom1970, tsSecondsFrom1899,
+    tsMsFrom1970, tsMsFrom1899);
+    
 {$IFNDEF USEYxdStr}
 type
   TStringCatHelper = class
@@ -318,6 +330,7 @@ type
     function GetSize: Cardinal;
     procedure Free();
     procedure SetAsDWORD(const Value: Cardinal);
+    function GetIsDateTime: Boolean;
   public
     FType: JSONDataType;
     FName: JSONString;
@@ -339,6 +352,8 @@ type
     procedure CopyValue(ASource: PJSONValue); {$IFDEF USEINLINE}inline;{$ENDIF}
 
     function TryAsDatetime(const DefaultValue: TDateTime = 0): TDateTime;
+
+    property IsDateTime: Boolean read GetIsDateTime;
 
     property AsBoolean: Boolean read GetAsBoolean write SetAsBoolean;
     property AsByte: Byte read GetAsByte write SetAsByte;
@@ -865,16 +880,7 @@ type
   end;
 
 const
-  //日期类型转换为Json数据时会转换成字符串，这个变量控制如何格式化
-  JsonDateFormat: JSONString = 'yyyy-mm-dd';
-  //时间类型转换为Json数据时会转换成字符串，这个变量控制如何格式化
-  JsonTimeFormat: JSONString = 'hh:nn:ss.zzz';
-  //日期时间类型转换为Json数据时会转换成字符串，这个变量控制如何格式化
-  JsonDateTimeFormat: JSONString = 'yyyy-mm-dd hh:nn:ss.zzz';
-  //浮点数精度
-  JsonFloatDigits: Integer = 6;
-  //Json 严格模式下日期类型的精度，默认为毫秒，可以设置为秒以便与某些系统兼容
-  JsonDatePrecision: TJsonDatePrecision = jdpMillisecond;
+  JSON_NO_TIMEZONE = -128;
   
 var
   // 是否启用严格检查模式，在严格模式下：
@@ -889,6 +895,24 @@ var
   // 按照Java格式编码，将#$0字符编码为#$C080
   JavaFormatUtf8: Boolean = True;
   {$ENDIF}
+
+var
+  //日期时间类型的时区，仅在Strict模式下生效，设置为相应的时区，以便输出
+  JsonTimezone: Shortint = JSON_NO_TIMEZONE; // 默认无时区
+  //日期类型转换为Json数据时会转换成字符串，这个变量控制如何格式化
+  JsonDateFormat: JSONString = 'yyyy-mm-dd';
+  //时间类型转换为Json数据时会转换成字符串，这个变量控制如何格式化
+  JsonTimeFormat: JSONString = 'hh:nn:ss.zzz';
+  //日期时间类型转换为Json数据时会转换成字符串，这个变量控制如何格式化
+  JsonDateTimeFormat: JSONString = 'yyyy-mm-dd hh:nn:ss.zzz';
+  //浮点数精度
+  JsonFloatDigits: Integer = 6;
+  //Json 严格模式下日期类型的精度，默认为毫秒，可以设置为秒以便与某些系统兼容
+  JsonDatePrecision: TJsonDatePrecision = jdpMillisecond;
+  //Json 日期时间格式化样式
+  JsonDateFormatStyle: TJsonDateFormatStyle = jdsNormal;
+  //整型转为日期时间时的转换方式
+  JsonIntToTimeStyle: TJsonIntToTimeStyle;
 
 {$IFNDEF USEYxdStr}
 function StrDupX(const s: PJSONChar; ACount:Integer): JSONString;
@@ -979,6 +1003,13 @@ function ParseJsonTime(p: PJSONChar; var ATime: TDateTime): Boolean;
 function ParseWebTime(p:PJSONChar; var AResult:TDateTime):Boolean;
 function FloatToStr(const value: Extended): string; {$IFDEF USEINLINE}inline;{$ENDIF}
 
+const
+  JsonTypeName: array [0 .. 8] of JSONString = ('Unknown', 'Null', 'String',
+    'Integer', 'Float', 'Boolean', 'DateTime', 'Array', 'Object');
+
+resourcestring
+  SBadConvert = '%s 不是一个有效的 %s 类型的值。';
+
 implementation
 
 {$IFDEF USERTTI}uses YxdRtti;{$ENDIF}
@@ -992,7 +1023,6 @@ resourcestring
   {$ENDIF}
   SBadJson = '当前内容不是有效的JSON字符串.';
   SCharNeeded = '当前位置应该是 "%s", 而不是 "%s".';
-  SBadConvert = '%s 不是一个有效的 %s 类型的值。';
   SBadNumeric = '"%s"不是有效的数值.';
   SBadJsonTime = '"%s"不是一个有效的日期时间值.';
   SNameNotFound = '项目名称未找到.';
@@ -1016,8 +1046,6 @@ resourcestring
   SObjectChildNeedName = '对象 %s 的第 %d 个子结点名称未赋值, 编码输出前必需赋值.';
 
 const
-  JsonTypeName: array [0 .. 8] of JSONString = ('Unknown', 'Null', 'String',
-    'Integer', 'Float', 'Boolean', 'DateTime', 'Array', 'Object');
   EParse_Unknown            = -1;
   EParse_BadStringStart     = 1;
   EParse_BadJson            = 2;
@@ -3117,15 +3145,25 @@ end;
 
 procedure StrictJsonTime(ABuilder: TStringCatHelper; ATime:TDateTime);
 const
-  JsonTimeStart: PJSONChar = '"/DATE(';
-  JsonTimeEnd:   PJSONChar = ')/"';
+  JsonTimeStart: PJSONChar = '/DATE(';
+  JsonTimeEnd:   PJSONChar = ')/';
+  UnixDelta: Int64 = 25569;
 var
-  MS: Int64;//时区信息不保存
+  MS: Int64; //时区信息不保存
 begin
-  MS := Trunc(ATime * 86400000);
-  ABuilder.Cat(JsonTimeStart, 7);
-  ABuilder.Cat(IntToStr(MS));
-  ABuilder.Cat(JsonTimeEnd, 3);
+  MS := Trunc((ATime - UnixDelta) * 86400000);
+  ABuilder.Cat(JsonTimeStart, 6);
+  if (JsonTimeZone >= -12) and (JsonTimeZone <= 12) then begin
+    Dec(MS, 3600000 * JsonTimeZone);
+    if JsonDatePrecision = jdpSecond then
+      MS := MS div 1000;
+    ABuilder.Cat(IntToStr(MS));
+    if JsonTimeZone >= 0 then
+      ABuilder.Cat('+');
+    ABuilder.Cat(JsonTimeZone);
+  end else
+    ABuilder.Cat(IntToStr(MS));
+  ABuilder.Cat(JsonTimeEnd, 2);
 end;
 
 function ValueAsDateTime(const DateFormat, TimeFormat, DateTimeFormat: JSONString; const AValue: TDateTime): JSONString;
@@ -3197,11 +3235,11 @@ begin
   else if FType = jdtString then begin
     if not(ParseDateTime(PJSONChar(GetString), Result) or
       ParseJsonTime(PJSONChar(GetString), Result) or ParseWebTime(PJSONChar(GetString), Result)) then
-      raise Exception.Create(Format(SBadConvert, ['String', 'DateTime']))
+      raise Exception.Create(Format(SBadConvert, [JsonTypeName[Integer(FType)], JsonTypeName[Integer(jdtDateTime)]]))
   end else if FType = jdtInteger then
     Result := AsInt64
   else
-    raise Exception.Create(Format(SBadConvert, [JsonTypeName[Integer(FType)], 'DateTime']));
+    raise Exception.Create(Format(SBadConvert, [JsonTypeName[Integer(FType)], JsonTypeName[Integer(jdtDateTime)]]));
 end;
 
 function JSONValue.GetAsDouble: Double;
@@ -3310,7 +3348,7 @@ begin
   else begin
     Stream := TPointerStream.Create(@FValue[0], Length(FValue));
     try
-      Result := LoadTextA(Stream, AEncoding);
+      Result := string(LoadTextA(Stream, AEncoding));
     finally
       FreeAndNil(Stream);
     end;
@@ -3344,6 +3382,18 @@ end;
 function JSONValue.GetAsWord: Word;
 begin
   Result := GetAsInt64;
+end;
+
+function JSONValue.GetIsDateTime: Boolean;
+var
+  ATime: TDateTime;
+begin
+  Result := FType = jdtDateTime;
+  if (not Result) and (FType = jdtString) and (Length(FValue) > 0) then begin
+    Result := ParseDateTime(@FValue[0], ATime) or
+      ParseJsonTime(@FValue[0], ATime) or
+      ParseWebTime(@FValue[0], ATime);
+  end;
 end;
 
 function JSONValue.GetObject: JSONBase;
@@ -4199,7 +4249,7 @@ class function JSONBase.InternalEncode(Obj: JSONBase; ABuilder: TStringCatHelper
           jdtDateTime:
             begin
               ABuilder.Cat(CharStringStart, 1);
-              if StrictJson then
+              if StrictJson or (JsonDateFormatStyle = jdsJsonTime) then
                 StrictJsonTime(ABuilder, Item.AsDateTime)
               else
                 ABuilder.Cat(Item.ToString);
