@@ -272,10 +272,10 @@ function Fetch(var AInput: string; const ADelim: string = ' ';
 function LengthAsDWordToHex(const Value: Cardinal): Integer;
 {$IFDEF USE_URLFUNC}
 // URL±àÂë
-function UrlEncode(const AUrl: StringA): StringA; overload;
-function UrlEncode(const AUrl: StringW): StringW; overload;
-function UrlEncodeA(const AStr: PCharA; OutBuf: PCharA): Integer; overload;
-function UrlEncodeW(const AStr: PCharW; OutBuf: PCharW): Integer; overload;
+function UrlEncode(const AUrl: StringA; ASpacesAsPlus: Boolean = True): StringA; overload;
+function UrlEncode(const AUrl: StringW; ASpacesAsPlus: Boolean = True): StringW; overload;
+function UrlEncodeA(const AStr: PCharA; OutBuf: PCharA; ASpacesAsPlus: Boolean = True): Integer; overload;
+function UrlEncodeW(const AStr: PCharW; OutBuf: PCharW; ASpacesAsPlus: Boolean = True): Integer; overload;
 // URL½âÂë
 function UrlDecode(const Src: PCharA; OutBuf: PCharA; RaiseError: Boolean = True): Integer; overload;
 function UrlDecode(const AStr: StringA; RaiseError: Boolean = True): StringA; overload;
@@ -1118,7 +1118,7 @@ begin
     Result := '';
 end;
 
-function UrlEncodeA(const AStr: PCharA; OutBuf: PCharA): Integer;
+function UrlEncodeA(const AStr: PCharA; OutBuf: PCharA; ASpacesAsPlus: Boolean): Integer;
 const
   HTTP_CONVERT: array[0..255] of {$IFDEF NEXTGEN}string{$ELSE}PCharA{$ENDIF} = (
     ' %00#','%01#','%02#','%03#','%04#','%05#','%06#','%07#'
@@ -1160,7 +1160,7 @@ begin
   Sp := AStr;
   Rp := OutBuf;
   while Sp^ <> {$IFDEF NEXTGEN}0{$ELSE}#0{$ENDIF} do begin
-    if Sp^ = {$IFDEF NEXTGEN}Ord(' '){$ELSE}' '{$ENDIF} then
+    if (Sp^ = {$IFDEF NEXTGEN}Ord(' '){$ELSE}' '{$ENDIF}) and ASpacesAsPlus then
       Rp^ := {$IFDEF NEXTGEN}Ord('+'){$ELSE}'+'{$ENDIF}
     else begin
       {$IFDEF NEXTGEN}
@@ -1181,7 +1181,7 @@ begin
   Result := IntPtr(Rp) - IntPtr(OutBuf);
 end;
 
-function UrlEncodeW(const AStr: PCharW; OutBuf: PCharW): Integer;
+function UrlEncodeW(const AStr: PCharW; OutBuf: PCharW; ASpacesAsPlus: Boolean): Integer;
 {$IFDEF NEXTGEN}
 var
   Tmp: StringW;
@@ -1234,7 +1234,7 @@ begin
   Sp := AStr;
   Rp := OutBuf;
   while Sp^ <> #0 do begin
-    if Sp^ = ' ' then
+    if (Sp^ = ' ') and ASpacesAsPlus then
       Rp^ := '+'
     else begin
       if Ord(Sp^) > $FF then begin
@@ -1263,19 +1263,19 @@ begin
 {$ENDIF}
 end;
 
-function UrlEncode(const AUrl: StringA): StringA;
+function UrlEncode(const AUrl: StringA; ASpacesAsPlus: Boolean): StringA;
 var
   I: Integer;
 begin
   if Length(AUrl) > 0 then begin
     {$IFDEF NEXTGEN}
     Result.SetLength(AUrl.Length * 3);
-    I := UrlEncodeA(PAnsiChar(AUrl), PAnsiChar(Result));
+    I := UrlEncodeA(PAnsiChar(AUrl), PAnsiChar(Result), ASpacesAsPlus);
     if Result.Length <> I then
       Result.SetLength(I);
     {$ELSE}
     SetLength(Result, Length(AUrl) * 3);
-    I := UrlEncodeA(PAnsiChar(AUrl), @Result[1]);
+    I := UrlEncodeA(PAnsiChar(AUrl), @Result[1], ASpacesAsPlus);
     if Length(Result) <> I then
       SetLength(Result, I);
     {$ENDIF}
@@ -1283,7 +1283,7 @@ begin
     Result := '';
 end;
 
-function UrlEncode(const AUrl: StringW): StringW;
+function UrlEncode(const AUrl: StringW; ASpacesAsPlus: Boolean): StringW;
 {$IFDEF NEXTGEN}
 begin
   Result := TNetEncoding.URL.Encode(AUrl);
@@ -1293,7 +1293,7 @@ var
 begin
   if Length(AUrl) > 0 then begin
     SetLength(Result, Length(AUrl) * 3);
-    I := UrlEncodeW(PWideChar(AUrl), @Result[1]);
+    I := UrlEncodeW(PWideChar(AUrl), @Result[1], ASpacesAsPlus);
     if Length(Result) <> I then
       SetLength(Result, I);
   end else
