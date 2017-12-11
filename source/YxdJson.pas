@@ -586,6 +586,7 @@ type
 
     // 解析指定的JSON字符串
     class function Parser(const Text: JSONString; RaiseError: Boolean = True): JSONBase; overload;
+    class function Parser(const AStream: TStream; RaiseError: Boolean = True): JSONBase; overload;
     class function Parser(P: PJSONChar; Len: Integer = -1; RaiseError: Boolean = True): JSONBase; overload;
     // 解析指定的JSON字符串
     class function ParseObject(const Text: JSONString; RaiseError: Boolean = True): JSONObject; overload;
@@ -4742,6 +4743,14 @@ begin
     FreeAndNil(Result);
     if RaiseError then raise;
   end;
+end;
+
+class function JSONBase.Parser(const AStream: TStream; RaiseError: Boolean = True): JSONBase;
+var
+  Data: JSONString;
+begin
+  Data := {$IFDEF JSON_UNICODE}LoadTextW{$ELSE}LoadTextA{$ENDIF}(AStream, TTextEncoding.teUnknown);
+  Result := Parser(Data, RaiseError);
 end;
 
 function JSONBase.FindIf(const ATag: Pointer; ANest: Boolean;
