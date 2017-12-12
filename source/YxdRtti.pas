@@ -174,7 +174,7 @@ type
     {$IFDEF USE_UNICODE}
     class procedure Serialize(Writer: TSerializeWriter; const Key: string; AInstance: TValue); overload;
     {$ENDIF}
-    class procedure Serialize(Writer: TSerializeWriter; AJson: JSONBase); overload;
+    class procedure Serialize(Writer: TSerializeWriter; AJson: JSONBase; IsBegin: Boolean = True); overload;
 
     class procedure ReadValue(AIn: JSONBase; ADest: Pointer; aType: {$IFDEF USE_UNICODE}PTypeInfo{$ELSE}PTypeInfo{$ENDIF}); overload;
     {$IFDEF USEDataSet}
@@ -806,7 +806,7 @@ begin
   {$ENDIF}
 end;
 
-class procedure TYxdSerialize.Serialize(Writer: TSerializeWriter; AJson: JSONBase);
+class procedure TYxdSerialize.Serialize(Writer: TSerializeWriter; AJson: JSONBase; IsBegin: Boolean);
 
   procedure DoSerialize(Writer: TSerializeWriter; AJson: JSONBase);
   var
@@ -818,7 +818,8 @@ class procedure TYxdSerialize.Serialize(Writer: TSerializeWriter; AJson: JSONBas
       Exit;
     if AJson.Count > 0 then begin
       IsArray := AJson.IsJSONArray;
-      Writer.BeginData(AJson.Name, IsArray);
+      if IsBegin then
+        Writer.BeginData(AJson.Name, IsArray);
 
       for I := 0 to AJson.Count - 1 do begin
         Item := AJson.Items[I];
@@ -863,8 +864,9 @@ class procedure TYxdSerialize.Serialize(Writer: TSerializeWriter; AJson: JSONBas
           Writer.WriteNull(Item.FName);
         end;
       end;
-      Writer.EndData;
-    end else begin
+      if IsBegin then
+        Writer.EndData;
+    end else if IsBegin then begin
       Writer.BeginData(AJson.Name, AJson.IsJSONArray);
       Writer.EndData;
     end;
@@ -873,9 +875,11 @@ class procedure TYxdSerialize.Serialize(Writer: TSerializeWriter; AJson: JSONBas
 begin
   if not Assigned(AJson) then
     Exit;
-  Writer.BeginRoot;
+  if IsBegin then   
+    Writer.BeginRoot;
   DoSerialize(Writer, AJson);
-  Writer.EndRoot;
+  if IsBegin then
+    Writer.EndRoot;
 end;
 
 {$IFDEF USE_UNICODE}
