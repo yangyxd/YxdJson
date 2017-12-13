@@ -370,6 +370,9 @@ type
     procedure CopyValue(ASource: PJSONValue); {$IFDEF USEINLINE}inline;{$ENDIF}
 
     {$IFDEF USEBlob}
+    /// <summary>
+    /// 将Variant字节数组存为Blob流
+    /// </summary>
     procedure SetVariantToStream(const Value: Variant);
     {$ENDIF}
 
