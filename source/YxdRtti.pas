@@ -183,6 +183,7 @@ type
     class procedure ReadObject(AIn: JSONBase; ADest: TObject);
     class procedure WriteValue(AOut: JSONBase; const Key: JSONString; ASource: Pointer; AType: PTypeInfo); overload;
     {$IFDEF USEDataSet}
+
     /// <summary>
     /// 将指定JSON数据转换到DataSet中
     /// <param name="AIn">输入JSON对象</param>
@@ -212,6 +213,21 @@ type
     class function WriteToValue(AIn: JSONBase): TValue; overload;
     class procedure WriteValue(AOut: JSONBase; const Key: JSONString; AInstance: TValue); overload;
     {$ENDIF}
+    /// <summary>
+    /// 写入Blob数据流
+    /// </summary>
+    class procedure WriteBlobStream(Writer: TSerializeWriter; const Data: Pointer; const Size: Int64; Base64Blob: Boolean = True);
+
+    /// <summary>
+    /// Blog流转字符串
+    /// </summary>
+    class function BlobStreamToString(const Data: Pointer; const Size: Int64; Base64Blob: Boolean = True): JSONString; overload;
+    class function BlobStreamToString(Data: TStream; Base64Blob: Boolean = True): JSONString; overload;
+
+    // 判断字符串是否是Blob数据
+    class function IsBlob(P: PJSONChar; HighL: Integer): Boolean;
+
+    class function BlobStringToStream(Data: Pointer; Size: Integer): TMemoryStream;
   end;
 
 type
@@ -261,9 +277,10 @@ type
     property DoEscape: Boolean read FDoEscape write FDoEscape;
   end;
 
+function EncodeBase64(const Input: Pointer; Size: Integer): string;
+
 implementation
 
-{$IFDEF USEDataSet}
 const
   CSBlobs: JSONString = '[blob]<';
   CSBlobBase64: PJSONChar = '[BS]'; //使用Base64编码Blob时的识别前缀
@@ -272,7 +289,6 @@ const
 var
   CSPBlobs: PJSONChar;
   CSPBlobs2, CSPBlobs3: PJSONChar;
-{$ENDIF}
 
 resourcestring
   SUnsupportPropertyType = '不支持的属性类型.';
@@ -280,6 +296,25 @@ resourcestring
   SArrayTypeMissed = '未知的数组元素类型.';
   SErrorJsonType = '错误的Json类型.';
   SObjectChildNeedName = '对象 %s 的第 %d 个子结点名称未赋值, 编码输出前必需赋值.';
+
+type TPointerStream = class(TCustomMemoryStream);
+
+function EncodeBase64(const Input: Pointer; Size: Integer): string;
+{$IFDEF USE_UNICODE}
+var
+  FBase64: TBase64Encoding;
+begin
+  FBase64 := TBase64Encoding.Create(-1);
+  try
+    Result := FBase64.EncodeBytesToString(Input, Size);
+  finally
+    FreeAndNil(FBase64);
+  end;
+{$ELSE}
+begin
+  Result := string(Base64Encode(Input^, Size));
+{$ENDIF}
+end;
 
 { FiledNameAttribute }
 
@@ -539,6 +574,23 @@ begin
     Result := AObj.ClassInfo
   else
     Result := nil;
+end;
+
+class function TYxdSerialize.IsBlob(P: PJSONChar; HighL: Integer): Boolean;
+begin
+  {$IFDEF USE_UNICODE}
+  Result := (HighL >= (CSBlobsLen shl 1))
+      and (PInt64(p)^ = PInt64(CSPBlobs)^)
+      and (PDWORD(IntPtr(P)+8)^ = PDWORD(CSPBlobs2)^)
+      and (PWORD(IntPtr(P)+12)^ = PWORD(CSPBlobs3)^)
+      and (PJSONChar(IntPtr(P) + HighL - 1)^ = '>');
+  {$ELSE}
+  Result := (HighL >= CSBlobsLen)
+      and (PDWORD(p)^ = PDWORD(CSPBlobs)^)
+      and (PWORD(IntPtr(P)+4)^ = PWORD(CSPBlobs2)^)
+      and (PByte(IntPtr(P)+6)^ = PByte(CSPBlobs3)^)
+      and (PJSONChar(IntPtr(P) + HighL)^ = '>');
+  {$ENDIF}
 end;
 
 class procedure TYxdSerialize.Serialize(Writer: TSerializeWriter; const Key: string;
@@ -858,6 +910,10 @@ class procedure TYxdSerialize.Serialize(Writer: TSerializeWriter; AJson: JSONBas
               else
                 Writer.WriteString(Item.FName, Item.ToString)
             end;
+          jdtBlob:
+            begin
+              Writer.WriteString(Item.FName, Item.AsString);
+            end;
           jdtNull, jdtUnknown:
             Writer.WriteNull(Item.FName);
         else
@@ -939,18 +995,7 @@ var
     else
       BlobStream.Position := 0;
     TBlobField(Field).SaveToStream(BlobStream);
-    {$IFDEF USE_UNICODE}
-    if Base64Blob then begin
-      Writer.Add(CSBlobs + CSBlobBase64 + JSONString(EncodeBase64(BlobStream.Memory, BlobStream.Position)) + '>');
-    end else
-      Writer.Add(CSBlobs + {$IFDEF USEYxdStr}YxdStr{$ELSE}YxdJson{$ENDIF}.BinToHex(BlobStream.Memory, BlobStream.Position) + '>');
-    {$ELSE}
-    if Base64Blob then
-      Writer.Add(CSBlobs + CSBlobBase64 + Base64Encode(BlobStream.Memory^, BlobStream.Position) + '>')
-    else begin
-      Writer.Add(CSBlobs + {$IFDEF USEYxdStr}YxdStr{$ELSE}YxdJson{$ENDIF}.BinToHex(BlobStream.Memory, BlobStream.Position) + '>');
-    end;
-    {$ENDIF}
+    WriteBlobStream(Writer, BlobStream, BlobStream.Position, Base64Blob);
   end;
 
   procedure AddDataSetRow(Writer: TSerializeWriter; DS: TDataSet);
@@ -1071,32 +1116,108 @@ begin
   end;
 end;
 
+class function TYxdSerialize.BlobStreamToString(Data: TStream; Base64Blob: Boolean): JSONString;
+var
+  M: TMemoryStream;
+begin
+  if Assigned(Data) then begin
+    if (Data is TMemoryStream) then
+      Result := BlobStreamToString(TMemoryStream(Data).Memory, Data.Size, Base64Blob)
+    else begin
+      M := TMemoryStream.Create;
+      try
+        M.LoadFromStream(Data);
+        Result := BlobStreamToString(M.Memory, M.Size, Base64Blob);
+      finally
+        M.Free;
+      end;
+    end;
+  end else
+    Result := '';
+end;
+
+class function TYxdSerialize.BlobStringToStream(Data: Pointer; Size: Integer): TMemoryStream;
+var
+  I: Integer;
+  {$IFDEF USE_UNICODE}
+  BSStream: TPointerStream;
+  {$ENDIF}
+  p: {$IFDEF USE_UNICODE}PByte{$ELSE}PAnsiChar{$ENDIF};
+  {$IFNDEF USE_UNICODE}
+  BStmp: JSONString;
+  {$ENDIF}
+  Buf: TBytes;
+begin
+  Result := nil;
+  P := Data;
+  I := Size - 1;
+  {$IFDEF USE_UNICODE}
+  Inc(P, CSBlobsLen shl 1);
+  if (I >= (CSBlobsLen + CSBlobBase64Len) shl 1) and
+    (PInt64(p)^ = PInt64(CSBlobBase64)^) then
+  begin
+    Inc(p, CSBlobBase64Len shl 1);
+    BSStream := TPointerStream.Create;
+    BSStream.SetPointer(p, I-((CSBlobsLen shl 1)+1)-8);
+    BSStream.Position := 0;
+    Result := TMemoryStream.Create;
+    try
+      DecodeStream(BSStream, Result);
+    finally
+      BSStream.Free;
+    end;
+  end else begin
+    {$IFDEF USEYxdStr}YxdStr{$ELSE}YxdJson{$ENDIF}.HexToBin(Pointer(p),
+      (I-(CSBlobsLen shl 1)-1) shr 1, Buf);
+    if Length(Buf) > 0 then begin
+      Result := TMemoryStream.Create;
+      Result.WriteBuffer(Buf[0], Length(Buf));
+    end;
+  end;
+  {$ELSE}
+  Inc(p, CSBlobsLen);
+  if (I >= (CSBlobsLen + CSBlobBase64Len)) and (PDWORD(p)^ = PDWORD(CSBlobBase64)^) then begin
+    Inc(p, CSBlobBase64Len);
+    BStmp := Base64Decode(p^, I-CSBlobsLen-CSBlobBase64Len);
+    Result := TMemoryStream.Create;
+    Result.WriteBuffer(BSTmp[1], Length(BStmp));
+  end else begin
+    {$IFDEF USEYxdStr}YxdStr{$ELSE}YxdJson{$ENDIF}.HexToBin(p, Size-CSBlobsLen, Buf);
+    if Length(Buf) > 0 then begin
+      Result := TMemoryStream.Create;
+      Result.WriteBuffer(Buf[0], Length(Buf));
+    end;
+  end;
+  {$ENDIF}
+end;
+
+class function TYxdSerialize.BlobStreamToString(const Data: Pointer;
+  const Size: Int64; Base64Blob: Boolean): JSONString;
+begin
+  {$IFDEF USE_UNICODE}
+  if Base64Blob then begin
+    Result := CSBlobs + CSBlobBase64 + JSONString(EncodeBase64(Data, Size)) + '>';
+  end else
+    Result := (CSBlobs + {$IFDEF USEYxdStr}YxdStr{$ELSE}YxdJson{$ENDIF}.BinToHex(Data, Size) + '>');
+  {$ELSE}
+  if Base64Blob then
+    Result := (CSBlobs + CSBlobBase64 + Base64Encode(Data^, Size) + '>')
+  else begin
+    Result := (CSBlobs + {$IFDEF USEYxdStr}YxdStr{$ELSE}YxdJson{$ENDIF}.BinToHex(Data, Size) + '>');
+  end;
+  {$ENDIF}
+end;
+
+class procedure TYxdSerialize.WriteBlobStream(Writer: TSerializeWriter; const Data: Pointer; const Size: Int64; Base64Blob: Boolean);
+begin
+  Writer.Add(BlobStreamToString(Data, Size, Base64Blob));
+end;
 
 {$IFDEF USEDataSet}
-{$IFDEF USE_UNICODE}
-type TPointerStream = class(TCustomMemoryStream);
-{$ENDIF}
 class function TYxdSerialize.ReadDataSet(AIn: JSONBase; ADest: TDataSet): Integer;
 var
   BlobStream: TStream;
   {$IFDEF USE_UNICODE} BSStream: TPointerStream;{$ENDIF}
-
-  function IsBlob(P: PJSONChar; HighL: Integer): Boolean;
-  begin
-    {$IFDEF USE_UNICODE}
-    Result := (HighL >= (CSBlobsLen shl 1))
-        and (PInt64(p)^ = PInt64(CSPBlobs)^)
-        and (PDWORD(IntPtr(P)+8)^ = PDWORD(CSPBlobs2)^)
-        and (PWORD(IntPtr(P)+12)^ = PWORD(CSPBlobs3)^)
-        and (PJSONChar(IntPtr(P) + HighL - 1)^ = '>');
-    {$ELSE}
-    Result := (HighL >= CSBlobsLen)
-        and (PDWORD(p)^ = PDWORD(CSPBlobs)^)
-        and (PWORD(IntPtr(P)+4)^ = PWORD(CSPBlobs2)^)
-        and (PByte(IntPtr(P)+6)^ = PByte(CSPBlobs3)^)
-        and (PJSONChar(IntPtr(P) + HighL)^ = '>');
-    {$ENDIF}
-  end;
 
   function GetBlodValue(Field: TField; Item: PJSONValue; var Buf: TBytes): Integer;
   var
@@ -2386,18 +2507,7 @@ var
               else
                 BlobStream.Position := 0;
               TBlobField(Field).SaveToStream(BlobStream);
-              {$IFDEF USE_UNICODE}
-              if Base64Blob then begin
-                Item.Add(CSBlobs + CSBlobBase64 + JSONString(EncodeBase64(BlobStream.Memory, BlobStream.Position)) + '>');
-              end else
-                Item.Add(CSBlobs + {$IFDEF USEYxdStr}YxdStr{$ELSE}YxdJson{$ENDIF}.BinToHex(BlobStream.Memory, BlobStream.Position) + '>');
-              {$ELSE}
-              if Base64Blob then
-                Item.Add(CSBlobs + CSBlobBase64 + Base64Encode(BlobStream.Memory^, BlobStream.Position) + '>')
-              else begin
-                Item.Add(CSBlobs + {$IFDEF USEYxdStr}YxdStr{$ELSE}YxdJson{$ENDIF}.BinToHex(BlobStream.Memory, BlobStream.Position) + '>');
-              end;
-              {$ENDIF}
+              Item.Add(BlobStreamToString(BlobStream.Memory, BlobStream.Position, Base64Blob));
             end;
         else
           Item.Add(Field.AsString);
@@ -2885,10 +2995,8 @@ begin
 end;
 
 initialization
-  {$IFDEF USEDataSet}
   CSPBlobs := PJSONChar(CSBlobs);
   CSPBlobs2 := CSPBlobs + 4;
   CSPBlobs3 := CSPBlobs2 + 2;
-  {$ENDIF}
 
 end.
