@@ -581,7 +581,7 @@ begin
   {$IFDEF USE_UNICODE}
   Result := (HighL >= (CSBlobsLen shl 1))
       and (PInt64(p)^ = PInt64(CSPBlobs)^)
-      and (PDWORD(IntPtr(P)+8)^ = PDWORD(CSPBlobs2)^)
+      and (PCardinal(IntPtr(P)+8)^ = PCardinal(CSPBlobs2)^)
       and (PWORD(IntPtr(P)+12)^ = PWORD(CSPBlobs3)^)
       and (PJSONChar(IntPtr(P) + HighL - 1)^ = '>');
   {$ELSE}
@@ -775,7 +775,7 @@ class procedure TYxdSerialize.Serialize(Writer: TSerializeWriter; const Key: str
             end;
           tkVariant:
             begin                
-              Writer.WriteVariant(AName, GetPropValue(AObj, string(APropList[J].Name)));
+              Writer.WriteVariant(AName, GetPropValue(AObj, APropList[J]));
             end;
           tkInt64:
             Writer.WriteInt64(AName, GetInt64Prop(AObj,APropList[J]));
@@ -2496,8 +2496,6 @@ var
             Item.Add({$IFDEF USE_UNICODE}Field.AsLargeInt{$ELSE}Field.AsInteger{$ENDIF});
           ftFloat, ftBCD: // ftSingle
             Item.Add(Field.AsFloat);
-          ftCurrency:
-            Item.Add(Field.AsCurrency);
           ftString, ftWideString, ftGuid:
             Item.Add(Field.AsString);
           ftBlob, ftGraphic, ftMemo, ftTypedBinary:
@@ -2730,7 +2728,7 @@ class procedure TYxdSerialize.writeValue(aOut: JSONBase; const key: JSONString; 
                 JSONObject(aOut).put(AName, GetSetProp(AObj,APropList[J],True));
             end;
           tkVariant:
-            JSONObject(aOut).put(AName, GetPropValue(AObj, string(APropList[J].Name)));
+            JSONObject(aOut).put(AName, GetPropValue(AObj, APropList[J]));
           tkInt64:
             JSONObject(aOut).put(AName, GetInt64Prop(AObj,APropList[J]));
           tkRecord, tkArray, tkDynArray://记录、数组、动态数组属性系统也不保存，也没提供所有太好的接口

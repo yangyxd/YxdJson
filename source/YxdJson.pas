@@ -762,7 +762,6 @@ type
     procedure Put(const Key: JSONString; const Value: Extended); overload;
     procedure Put(const Key: JSONString; const Value: Double); overload;
     procedure Put(const Key: JSONString; const Value: Variant); overload;
-    procedure Put(const Key: JSONString; const Value: OleVariant); overload;
     procedure Put(const Key: JSONString; Value: JSONObject); overload;
     procedure Put(const Key: JSONString; Value: JSONArray); overload;
     {$IFDEF USEBlob}
@@ -860,7 +859,6 @@ type
     procedure Add(const Value: Extended); overload;
     procedure Add(const Value: Double); overload;
     procedure Add(const Value: Variant); overload;
-    procedure Add(const Value: OleVariant); overload;
     procedure Add(const Value: array of const); overload;
     procedure Add(Value: JSONObject); overload;
     procedure Add(Value: JSONArray); overload;
@@ -5833,16 +5831,6 @@ begin
   AddChildArray(Key, Value);
 end;
 
-procedure JSONObject.Put(const Key: JSONString; const Value: OleVariant);
-var
-  Item: PJSONValue;
-begin
-  Item := Add(Key);
-  Item.AsVariant := value;
-  if Assigned(Item.FObject) then
-    Item.FObject.FParent := Self;
-end;
-
 {$IFDEF USEBlob}
 procedure JSONObject.Put(const Key: JSONString; Value: TStream);
 begin
@@ -5922,8 +5910,8 @@ begin
           Result.Add(AItems[I].VWideChar);
         vtPWideChar:
           Result.Add(AItems[I].VPWideChar);
-        vtCurrency:
-          Result.Add(AItems[I].VCurrency^);
+        //vtCurrency:
+        //  Result.Add(AItems[I].VCurrency^);
         vtInt64:
           Result.Add(AItems[I].VInt64^);
     {$IFDEF UNICODE}       // variants
@@ -6499,16 +6487,6 @@ begin
 end;
 
 procedure JSONArray.add(const value: Variant);
-var
-  Item: PJSONValue;
-begin
-  Item := NewJsonValue();
-  Item.AsVariant := value;
-  if Assigned(Item.FObject) then
-    Item.FObject.FParent := Self;
-end;
-
-procedure JSONArray.Add(const Value: OleVariant);
 var
   Item: PJSONValue;
 begin

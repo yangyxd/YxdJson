@@ -1990,21 +1990,44 @@ begin
   if ASize > 0 then begin
     SetLength(ABuffer, ASize);
     AStream.ReadBuffer((@ABuffer[0])^, ASize);
-    if AEncoding in [teUnknown,teAuto] then
-      AEncoding := DetectTextEncoding(@ABuffer[0], ASize, ABomExists);
-    if AEncoding=teAnsi then
+    if AEncoding in [teUnknown, teAuto] then
+      AEncoding := DetectTextEncoding(@ABuffer[0], ASize, ABomExists)
+    else if ASize >= 2 then begin
+      case AEncoding of
+        teUnicode16LE:
+          ABomExists := (ABuffer[0] = $FF) and (ABuffer[1] = $FE);
+        teUnicode16BE:
+          ABomExists := (ABuffer[1] = $FE) and (ABuffer[1] = $FF);
+        teUTF8:
+          begin
+            if ASize >= 3 then
+              ABomExists := (ABuffer[0] = $EF) and (ABuffer[1] = $BB) and
+                (ABuffer[2] = $BF)
+            else
+              ABomExists := false;
+          end;
+      end;
+    end else
+      ABomExists := false;
+    if AEncoding = teAnsi then
+      {$IFDEF NEXTGEN}
+      Result := ABuffer
+      {$ELSE}
       SetString(Result, PChar(ABuffer), Length(ABuffer))
+      {$ENDIF}
     else if AEncoding = teUTF8 then begin
-      if ABomExists then
-        Result := AnsiEncode(Utf8Decode(@ABuffer[3], ASize-3))
-      else
+      if ABomExists then begin
+        if ASize > 3 then
+          Result := AnsiEncode(Utf8Decode(@ABuffer[3], ASize - 3))
+        else
+          Result := '';
+      end else
         Result := AnsiEncode(Utf8Decode(@ABuffer[0], ASize));
-      end
-    else begin
+    end else begin
       if AEncoding = teUnicode16BE then
-        ExchangeByteOrder(@ABuffer[0],ASize);
+        ExchangeByteOrder(@ABuffer[0], ASize);
       if ABomExists then
-        Result := AnsiEncode(PWideChar(@ABuffer[2]), (ASize-2) shr 1)
+        Result := AnsiEncode(PWideChar(@ABuffer[2]), (ASize - 2) shr 1)
       else
         Result := AnsiEncode(PWideChar(@ABuffer[0]), ASize shr 1);
     end;
