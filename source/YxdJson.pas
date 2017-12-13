@@ -136,11 +136,7 @@ interface
 {$DEFINE USEBlob}       // 是否使用Blob功能, 低版本Delphi如果要使用单文件，则不能开启此项，否则需要添加Base64.pas单元
 
 {$IFDEF USERTTI}
-  {$IF RTLVersion>=10}
-  {$IFNDEF VER150}
-    {$DEFINE USEDBRTTI}    // 是否使用DataSet序列化功能，必须先启用USERTTI
-  {$ENDIF}
-  {$IFEND}
+  {$DEFINE USEDBRTTI}    // 是否使用DataSet序列化功能，必须先启用USERTTI
 {$ENDIF}
 
 (* Delphi 版本控制条件编译 *)
@@ -680,6 +676,7 @@ type
     procedure PutObjectValue(const Key: JSONString; ASource: Pointer; AType: PTypeInfo); overload;
     // 将指定的对象实例加入json中
     procedure PutObject(const Key: JSONString; ASource: TObject);
+    {$ENDIF}
     {$IFDEF USEDBRTTI}
     /// <summary>
     /// 将指定的数据集对象实例数据加入json中
@@ -699,7 +696,6 @@ type
     /// 将当前json数据转换到DataSet中，返回转换成功的数据行数
     /// </summary>
     function ToDataSet(aOut: TDataSet): Integer;
-    {$ENDIF}
     {$ENDIF}
     {$IFDEF JSON_RTTI}
     // 将当前json数据设置到AInstance指定的来源地址和类型数据中

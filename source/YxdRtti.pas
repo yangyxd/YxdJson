@@ -46,6 +46,7 @@ interface
 {$DEFINE USEIniSerialize}         // 使用INI序列化模块
 {$DEFINE USEXmlSerialize}         // 使用XML序列化模块
 {$DEFINE USEJsonSerialize}        // 使用Json序列化模块
+{$DEFINE USEDataSet}              // 是否使用DataSet序列化功能
 
 
 {$IF RTLVersion>=26}
@@ -54,7 +55,7 @@ interface
 
 {$IF RTLVersion>=10}
 {$IFNDEF VER150}
-{$DEFINE USEDataSet}              // 是否使用DataSet序列化功能
+{$DEFINE HELPER_SUPPORT}
 {$ENDIF}
 {$IFEND}
 
@@ -92,6 +93,7 @@ type
   {$ENDIF}
 
   {$IFDEF USEDataSet}
+  {$IFDEF HELPER_SUPPORT}
   // DataSet Helper
   TDateSetHelper = class helper for TDataSet
     function Exist(const FieldName: string): Boolean;
@@ -104,6 +106,7 @@ type
     function GetString(const FieldName: string): string;
     function GetWideString(const FieldName: string): WideString;
   end;
+  {$ENDIF}
   {$ENDIF}
 
 type
@@ -354,6 +357,7 @@ end;
 { TDateSetHelper }
 
 {$IFDEF USEDataSet}
+{$IFDEF HELPER_SUPPORT}
 function TDateSetHelper.Exist(const FieldName: string): Boolean;
 begin
   Result := FindField(FieldName) <> nil;
@@ -450,6 +454,7 @@ begin
   else
     Result := '';
 end;
+{$ENDIF}
 {$ENDIF}
 
 { TSerializeWriter }
@@ -774,8 +779,12 @@ class procedure TYxdSerialize.Serialize(Writer: TSerializeWriter; const Key: str
               Writer.WriteFloat(AName, GetFloatProp(AObj, APropList[J]));
             end;
           tkVariant:
-            begin                
+            begin
+              {$IFDEF NEXTGEN}
               Writer.WriteVariant(AName, GetPropValue(AObj, APropList[J]));
+              {$ELSE}
+              Writer.WriteVariant(AName, GetPropValue(AObj, string(APropList[J].Name)));
+              {$ENDIF}
             end;
           tkInt64:
             Writer.WriteInt64(AName, GetInt64Prop(AObj,APropList[J]));
@@ -1000,9 +1009,11 @@ var
 
   procedure AddDataSetRow(Writer: TSerializeWriter; DS: TDataSet);
   var
+    I: Integer;
     Field: TField;
   begin
-    for Field in DS.Fields do begin
+    for I := 0 to DS.Fields.Count - 1 do begin
+      Field := DS.Fields[I];
       // 判断字段是否在要求内
       if Field.IsNull then begin
         if Field.IsBlob then
@@ -1050,11 +1061,13 @@ var
 
   procedure AddDataSet(Writer: TSerializeWriter; DS: TDataSet);
   var
+    I: Integer;
     Field: TField;
     MoveIndex, StepIndex: Integer;
   begin
     Writer.BeginData('meta', True);
-    for Field in DS.Fields do begin
+    for I := 0 to DS.Fields.Count - 1 do begin
+      Field := DS.Fields[I];
       Writer.BeginData('', True);
       AddDataSetMeta(Writer, Field);
       Writer.EndData;
@@ -1358,7 +1371,7 @@ var
   Item, ItemChild: PJSONValue;
   ItemObject: JSONBase;
   Field: TField;
-  I: Integer;
+  I, J: Integer;
 begin
   Result := -1;
   if (not Assigned(aDest)) or (not Assigned(AIn)) then Exit;
@@ -1385,7 +1398,8 @@ begin
       ItemObject := Data.GetJsonObject(0);
       if not Assigned(ItemObject) then
         Exit;
-      for Item in ItemObject do begin
+      for J := 0 To ItemObject.Count - 1 do begin
+        Item := ItemObject[J];
         if Item.FType = jdtNull then begin
           if Length(Item.FName) > 0 then  // 从下一条记录中查找
             for i := 1 to Data.Count - 1 do begin
@@ -1419,7 +1433,8 @@ begin
     end; 
     
     try
-      for Item in Data do begin
+      for J := 0 To Data.Count - 1 do begin
+        Item := Data[J];
         ItemObject := Item.GetObject;
         if ItemObject = nil then Continue;
         // 数组模式
@@ -1432,7 +1447,8 @@ begin
           ADest.Post;
         end else begin  // 对象模式
           ADest.Append;
-          for ItemChild in ItemObject do begin
+          for I := 0 To ItemObject.Count - 1 do begin 
+            ItemChild := ItemObject[I];
             Field := ADest.FindField(ItemChild.FName);
             if not Assigned(Field) then
               Continue;
@@ -2479,8 +2495,10 @@ var
   procedure AddDataSetRow(DS: TDataSet; Item: JSONArray);
   var
     Field: TField;
+    I: Integer;
   begin
-    for Field in DS.Fields do begin
+    for I := 0 to DS.Fields.Count - 1 do begin
+      Field := DS.Fields[I];
       // 判断字段是否在要求内
       if Field.IsNull then
         Item.Add(null)
@@ -2517,12 +2535,11 @@ var
   procedure AddDataSet(DS: TDataSet);
   var
     Data: JSONArray;
-    Field: TField;
-    MoveIndex, StepIndex: Integer;
+    MoveIndex, StepIndex, I: Integer;
   begin
     Data := JSONObject(aOut).AddChildArray('meta');
-    for Field in DS.Fields do
-      AddDataSetMeta(Data.AddChildArray(), Field);
+    for I := 0 to DS.Fields.Count - 1 do
+      AddDataSetMeta(Data.AddChildArray(), DS.Fields[I]);
 
     BlobStream := nil;
     DS.DisableControls;
@@ -2728,7 +2745,11 @@ class procedure TYxdSerialize.writeValue(aOut: JSONBase; const key: JSONString; 
                 JSONObject(aOut).put(AName, GetSetProp(AObj,APropList[J],True));
             end;
           tkVariant:
+            {$IFDEF NEXTGEN}
             JSONObject(aOut).put(AName, GetPropValue(AObj, APropList[J]));
+            {$ELSE}
+            JSONObject(aOut).put(AName, GetPropValue(AObj, string(APropList[J].Name)));
+            {$ENDIF}
           tkInt64:
             JSONObject(aOut).put(AName, GetInt64Prop(AObj,APropList[J]));
           tkRecord, tkArray, tkDynArray://记录、数组、动态数组属性系统也不保存，也没提供所有太好的接口
