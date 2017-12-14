@@ -11,8 +11,9 @@ unit YxdAdoStream;
 interface
 
 uses
-  Windows, Classes, Sysutils, comobj, ActiveX, ole2, adoint, adodb;
+  Windows, Classes, Sysutils, comobj, ActiveX, ole2, adoint, adodb, db;
 
+function CheckADODataSet(const ADataSet: TDataSet): TCustomADODataSet;
 /// <summary>
 /// 从流中加载数据集对象
 /// </summary>
@@ -23,6 +24,17 @@ procedure StreamToDataSet(AStream: TStream; ADataSet: TCustomADODataSet);
 procedure DataSetToStream(ADataSet: TCustomADODataSet; AStream: TStream);
 
 implementation
+
+resourcestring
+  SInvalidDataSet = '参数DataSet必须是AdoDataSet';
+
+function CheckADODataSet(const ADataSet: TDataSet): TCustomADODataSet;
+begin
+  if not (ADataSet is TCustomADODataSet) then
+    raise Exception.Create(SInvalidDataSet)
+  else
+    Result := TCustomADODataSet(ADataSet);
+end;
 
 procedure DataSetToStream(ADataSet:TCustomADODataSet; AStream:TStream);
 var
