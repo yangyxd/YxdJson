@@ -370,6 +370,7 @@ type
     /// 将Variant字节数组存为Blob流
     /// </summary>
     procedure SetVariantToStream(const Value: Variant);
+    function GetVariantFormStream(): Variant;
     {$ENDIF}
 
     function TryAsDatetime(const DefaultValue: TDateTime = 0): TDateTime;
@@ -527,8 +528,8 @@ type
     ///  <param name="AEncoding">编码格式</param>
     ///  <param name="AWriteBom">是否写入BOM</param>
     ///  <remarks>注意当前结点的名称不会被写入</remarks>
-    procedure SaveToStream(AStream: TStream; AIndent: Integer; AEncoding: TTextEncoding; AWriteBOM: Boolean); overload;
-    procedure SaveToStream(AStream: TStream; AIndent: Integer = 0); overload;
+    procedure SaveToStream(AStream: TStream; AIndent: Integer; AEncoding: TTextEncoding; AWriteBOM: Boolean; ADoEscape: Boolean = False); overload;
+    procedure SaveToStream(AStream: TStream; AIndent: Integer = 0; ADoEscape: Boolean = False); overload;
     /// <summary>从流的当前位置开始加载JSON对象</summary>
     ///  <param name="AStream">源数据流</param>
     ///  <param name="AEncoding">源文件编码，如果为teUnknown，则自动判断</param>
@@ -3813,6 +3814,11 @@ begin
   WriteVarArrayToStream(Value, S);
   AsStream := S;
 end;
+
+function JSONValue.GetVariantFormStream(): Variant;
+begin
+  Result := ReadVarArrayFromStream(AsStream);
+end;
 {$ENDIF}
 
 {$IFDEF JSON_RTTI}
@@ -5367,21 +5373,21 @@ begin
 end;
 
 procedure JSONBase.SaveToStream(AStream: TStream; AIndent: Integer; AEncoding: TTextEncoding;
-  AWriteBOM: Boolean);
+  AWriteBOM, ADoEscape: Boolean);
 begin
   if AEncoding = teUTF8 then
-    SaveTextU(AStream, {$IFDEF USEYxdStr}YxdStr.{$ELSE}YxdJson.{$ENDIF}Utf8Encode(toString(AIndent)), AWriteBom)
+    SaveTextU(AStream, {$IFDEF USEYxdStr}YxdStr.{$ELSE}YxdJson.{$ENDIF}Utf8Encode(toString(AIndent, ADoEscape)), AWriteBom)
   else if AEncoding = teAnsi then
-    SaveTextA(AStream, AnsiString(toString(AIndent)))
+    SaveTextA(AStream, AnsiString(toString(AIndent, ADoEscape)))
   else if AEncoding = teUnicode16LE then
-    SaveTextW(AStream, toString(AIndent), AWriteBom)
+    SaveTextW(AStream, toString(AIndent, ADoEscape), AWriteBom)
   else
-    SaveTextWBE(AStream, toString(AIndent), AWriteBom);
+    SaveTextWBE(AStream, toString(AIndent, ADoEscape), AWriteBom);
 end;
 
-procedure JSONBase.SaveToStream(AStream: TStream; AIndent: Integer);
+procedure JSONBase.SaveToStream(AStream: TStream; AIndent: Integer; ADoEscape: Boolean);
 begin
-  SaveToStream(AStream, AIndent, {$IFDEF JSON_UNICODE}teUTF8{$ELSE}teAnsi{$ENDIF}, False);
+  SaveToStream(AStream, AIndent, {$IFDEF JSON_UNICODE}teUTF8{$ELSE}teAnsi{$ENDIF}, False, ADoEscape);
 end;
 
 {$IFDEF USERTTI}
