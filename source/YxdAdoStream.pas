@@ -10,8 +10,32 @@ unit YxdAdoStream;
 
 interface
 
+{$IF RTLVersion>=24}
+{$LEGACYIFEND ON}
+{$IFEND}
+
+{$IF defined(FPC)}
+  {$DEFINE USEINLINE}
+{$IFEND}
+{$IF RTLVersion>=18}
+  {$DEFINE USEINLINE}
+{$IFEND}
+
+
 uses
-  Windows, Classes, Sysutils, comobj, ActiveX, ole2, adoint, adodb, db;
+  Windows, Classes, Sysutils, comobj, ActiveX,
+  {$IFDEF USEINLINE}Ole2, {$ENDIF}
+  adoint, adodb, db;
+
+{$IFNDEF USEINLINE}
+const
+  IID_IPersistStream: TGUID = (
+    D1:$00000109;D2:$0000;D3:$0000;D4:($C0,$00,$00,$00,$00,$00,$00,$46));
+  IID_IStream: TGUID = (
+    D1:$0000000C;D2:$0000;D3:$0000;D4:($C0,$00,$00,$00,$00,$00,$00,$46));
+
+
+{$ENDIF}
 
 function CheckADODataSet(const ADataSet: TDataSet): TCustomADODataSet;
 /// <summary>
@@ -74,8 +98,8 @@ begin
     ADataSet.Recordset := nil;
     try
       ATemp.GetInterface(System.PGuid(@IID_IStream)^, AIntf);
-      ComObj.OleCheck(Ole2.OleLoadFromStream(AIntf,
-        Ole2.PGuid(@AdoInt.IID__Recordset)^, ARecordset));
+      ComObj.OleCheck({$IFDEF USEINLINE}Ole2.{$ENDIF}OleLoadFromStream(AIntf,
+        {$IFDEF USEINLINE}Ole2.{$ENDIF}PGuid(@AdoInt.IID__Recordset)^, ARecordset));
       ADataSet.Recordset := ARecordSet;
     except
       OutputDebugString(PChar(Exception(ExceptObject).Message));
