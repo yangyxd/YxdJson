@@ -359,7 +359,7 @@ function StartWith(s, startby: PChar; AIgnoreCase: Boolean): Boolean;
 function StartWithIgnoreCase(s, startby: PChar): Boolean;
 //保存文本
 procedure SaveTextA(AStream: TStream; const S: StringA);
-procedure SaveTextU(AStream: TStream; const S: StringA; AWriteBom: Boolean = True);
+procedure SaveTextU(AStream: TStream; const S: StringA; AWriteBom: Boolean = True; IsUtf8: Boolean = False);
 procedure SaveTextW(AStream: TStream; const S: StringW; AWriteBom: Boolean = True);
 procedure SaveTextWBE(AStream: TStream; const S: StringW; AWriteBom: Boolean = True);
 
@@ -1750,8 +1750,9 @@ end;
 function Utf8Encode(p:PWideChar; l:Integer): AnsiString;
 var
   ps:PWideChar;
-  pd,pds:PAnsiChar;
-  c:Cardinal;
+  pd{$IFNDEF MSWINDOWS}, pds{$ENDIF}:PAnsiChar;
+  {$IFNDEF MSWINDOWS}c:Cardinal;{$ENDIF}
+  dl: Integer;
 begin
   if p=nil then
     Result := ''
@@ -1762,12 +1763,19 @@ begin
         Inc(ps);
       l:=ps-p;
     end;
+    dl := l*3;
     {$IFDEF NEXTGEN}
-    Result.Length:=l*3;
+    Result.Length:= dl;
     Result.IsUtf8 := True;
     {$ELSE}
-    SetLength(Result, l*3);//UTF8每个字符最多6字节长,一次性分配足够的空间
+    SetLength(Result, dl);//UTF8每个字符最多6字节长,一次性分配足够的空间
     {$ENDIF}
+    {$IFDEF MSWINDOWS}
+    // Windows下直接调用操作系统的API
+    pd := PAnsiChar(Result);
+    dl := WideCharToMultiByte(CP_UTF8, 0, p, l, pd, dl, nil, nil);
+    SetLength(Result, dl);
+    {$ELSE}
     if l>0 then begin
       ps := p;
       pd := PAnsiChar(Result);
@@ -1852,6 +1860,7 @@ begin
       SetLength(Result, IntPtr(pd)-IntPtr(pds));
       {$ENDIF}
     end;
+    {$ENDIF}
   end;
 end;
 {$ENDIF}
@@ -2382,7 +2391,7 @@ function TStringCatHelper.GetValue: string;
 var
   L: Integer;
 begin
-  L := FDest - PChar(FValue);
+  L := FDest - FStart;
   SetLength(Result, L);
   Move(FStart^, PChar(Result)^, L{$IFDEF UNICODE} shl 1{$ENDIF});
 end;
@@ -3250,7 +3259,7 @@ begin
   AStream.WriteBuffer(PAnsiChar(S)^, Length(S))
 end;
 
-procedure SaveTextU(AStream: TStream; const S: AnsiString; AWriteBom: Boolean);
+procedure SaveTextU(AStream: TStream; const S: AnsiString; AWriteBom, IsUtf8: Boolean);
 
   procedure WriteBom;
   var
@@ -3268,13 +3277,16 @@ procedure SaveTextU(AStream: TStream; const S: AnsiString; AWriteBom: Boolean);
     T: AnsiString;
   begin
     T := YxdStr.Utf8Encode({$IFDEF NEXTGEN}AnsiDecode(S){$ELSE}string(S){$ENDIF});
-    AStream.WriteBuffer(PAnsiChar(T)^, Length(T));
+    AStream.WriteBuffer(PCharA(T)^, Length(T));
   end;
 
 begin
   if AWriteBom then
     WriteBom;
-  SaveAnsi;
+  if IsUtf8 then
+    AStream.WriteBuffer(PCharA(S)^, Length(S))
+  else
+    SaveAnsi;
 end;
 
 procedure SaveTextW(AStream: TStream; const S: StringW; AWriteBom: Boolean);

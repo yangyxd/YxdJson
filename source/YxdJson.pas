@@ -547,7 +547,7 @@ type
     ///  <param name="AWriteBOM">是否写入UTF-8的BOM</param>
     ///  <remarks>注意当前结点的名称不会被写入</remarks>
     procedure SaveToFile(const AFileName: JSONString; AIndent: Integer = 0); overload;
-    procedure SaveToFile(const AFileName: JSONString; AIndent: Integer; AEncoding: TTextEncoding; AWriteBOM: Boolean); overload;
+    procedure SaveToFile(const AFileName: JSONString; AIndent: Integer; AEncoding: TTextEncoding; AWriteBOM: Boolean = True); overload;
     /// <summary>从指定的文件中加载当前对象</summary>
     ///  <param name="AFileName">要加载的文件名</param>
     ///  <param name="AEncoding">源文件编码，如果为teUnknown，则自动判断</param>
@@ -4687,19 +4687,17 @@ end;
 class function JSONBase.InternalEncode(Obj: JSONBase; ABuilder: TStringCatHelper;
   AIndent: Integer; ADoEscape: Boolean): TStringCatHelper;
 
-  procedure DoEncode(ANode: JSONBase; ALevel:Integer);
+  procedure DoEncode(ANode: JSONBase; ALevel: Integer);
   var
     I: Integer;
     Item: PJSONValue;
     IsArray: Boolean;
   begin
     if ANode.FItems.Count > 0 then begin
-
-      if ANode.GetIsArray then begin
-        IsArray := True;
+      IsArray := ANode.GetIsArray;
+      if IsArray then begin
         ABuilder.Cat(CharArrayStart, 1);
       end else begin
-        IsArray := False;
         ABuilder.Cat(CharObjectStart, 1);
       end;
 
@@ -5567,7 +5565,7 @@ end;
 
 procedure JSONBase.SaveToFile(const AFileName: JSONString; AIndent: Integer);
 begin
-  SaveToFile(AFileName, AIndent, {$IFDEF JSON_UNICODE}teUnicode16LE{$ELSE}teAnsi{$ENDIF}, False);
+  SaveToFile(AFileName, AIndent, {$IFDEF JSON_UNICODE}teUTF8{$ELSE}teAnsi{$ENDIF});
 end;
 
 procedure JSONBase.SaveToFile(const AFileName: JSONString; AIndent: Integer; AEncoding: TTextEncoding;
@@ -5588,7 +5586,7 @@ procedure JSONBase.SaveToStream(AStream: TStream; AIndent: Integer; AEncoding: T
   AWriteBOM, ADoEscape: Boolean);
 begin
   if AEncoding = teUTF8 then
-    SaveTextU(AStream, {$IFDEF USEYxdStr}YxdStr.{$ELSE}YxdJson.{$ENDIF}Utf8Encode(toString(AIndent, ADoEscape)), AWriteBom)
+    SaveTextU(AStream, {$IFDEF USEYxdStr}YxdStr.{$ELSE}YxdJson.{$ENDIF}Utf8Encode(toString(AIndent, ADoEscape)), AWriteBom, True)
   else if AEncoding = teAnsi then
     SaveTextA(AStream, AnsiString(toString(AIndent, ADoEscape)))
   else if AEncoding = teUnicode16LE then
