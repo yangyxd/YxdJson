@@ -17,6 +17,13 @@
  --------------------------------------------------------------------
   更新记录
  --------------------------------------------------------------------
+ ver 1.0.22 2017.12.15
+ --------------------------------------------------------------------
+  * 今天是个好日子
+  * 修改 blob 相关功能，增加AsBytes
+  + 增加编译开关 USEBase64, 在低版本Delphi中，如果要使用单文件，需要
+    关闭它
+  
  ver 1.0.21 2017.12.13
  --------------------------------------------------------------------
   + 增加 blob 支持，可以直接添加流作为 blob数据
@@ -130,10 +137,10 @@ interface
 {$endif}  
 
 (* 功能可选项条件编译 *)
-{$DEFINE USEYxdStr}     // 是否使用YxdStr单元
-{$DEFINE USERTTI}       // 是否使用RTTI功能
-{$DEFINE USERegEx}      // 是否使用正则表达式搜索功能，D2010之前版本需要引用相关单元
-{$DEFINE USEBlob}       // 是否使用Blob功能, 低版本Delphi如果要使用单文件，则不能开启此项，否则需要添加Base64.pas单元
+{$DEFINE USEYxdStr}    // 是否使用YxdStr单元
+{$DEFINE USERTTI}      // 是否使用RTTI功能
+{$DEFINE USERegEx}     // 是否使用正则表达式搜索功能，D2010之前版本需要引用相关单元
+{$DEFINE USEBase64}    // 是否使用Base64单元
 
 {$IFDEF USERTTI}
   {$DEFINE USEDBRTTI}    // 是否使用DataSet序列化功能，必须先启用USERTTI
@@ -178,9 +185,7 @@ uses
   {$IF (RTLVersion>=26) and (not Defined(NEXTGEN))}AnsiStrings, {$IFEND}
   {$IFDEF USERegEx}{$IF RTLVersion<22}{2007-2010}PerlRegEx, pcre, {$ELSE}RegularExpressionsCore, {$IFEND}{$ENDIF}
   {$IFNDEF USERTTI}
-  {$IFDEF USEBlob}
-  {$IFDEF JSON_UNICODE}Soap.EncdDecd, {$ELSE}Base64, {$ENDIF}
-  {$ENDIF}
+  {$IFDEF JSON_UNICODE}Soap.EncdDecd, {$ELSE}{$IFDEF USEBase64}Base64, {$ENDIF}{$ENDIF}
   {$IF CompilerVersion > 27}System.NetEncoding, {$IFEND}
   {$ENDIF}
   SysUtils, Classes, Variants, Math, DateUtils;
@@ -247,8 +252,7 @@ type
 
 type
   JSONDataType = (jdtUnknown, jdtNull, jdtString, jdtInteger, jdtFloat,
-    jdtBoolean, jdtDateTime, jdtObject
-    {$IFDEF USEBlob}, jdtBlob{$ENDIF}
+    jdtBoolean, jdtDateTime, jdtObject, jdtBytes
   );
 
 type
@@ -340,11 +344,10 @@ type
     procedure Free();
     procedure SetAsDWORD(const Value: Cardinal);
     function GetIsDateTime: Boolean;
-    {$IFDEF USEBlob}
     function GetAsStream: TStream;
     procedure SetAsStream(const Value: TStream);
     function GetIsBlob: Boolean;
-    {$ENDIF}
+    procedure SetAsBytes(const Value: TBytes);
   public
     FType: JSONDataType;
     FName: JSONString;
@@ -365,20 +368,24 @@ type
     {$ENDIF}
     procedure CopyValue(ASource: PJSONValue); {$IFDEF USEINLINE}inline;{$ENDIF}
 
-    {$IFDEF USEBlob}
     /// <summary>
     /// 将Variant字节数组存为Blob流
     /// </summary>
     procedure SetVariantToStream(const Value: Variant);
     function GetVariantFormStream(): Variant;
-    {$ENDIF}
+
+    /// <summary>
+    /// 解析Blob字符串
+    /// </summary>
+    function ParseBlobData(): Boolean;
+
+    procedure SetBytes(const Data: Pointer; ASize: NativeInt); overload;
+    procedure SetBytes(Source: TStream; IsAll: Boolean = True); overload;
 
     function TryAsDatetime(const DefaultValue: TDateTime = 0): TDateTime;
 
     property IsDateTime: Boolean read GetIsDateTime;
-    {$IFDEF USEBlob}
     property IsBlob: Boolean read GetIsBlob;
-    {$ENDIF}
 
     property AsBoolean: Boolean read GetAsBoolean write SetAsBoolean;
     property AsByte: Byte read GetAsByte write SetAsByte;
@@ -392,9 +399,8 @@ type
     property AsVariant: Variant read GetAsVariant write SetAsVariant; // 仅支持常用类型
     property AsJsonObject: JSONObject read GetAsJSONObject write SetAsJSONObject;
     property AsJsonArray: JSONArray read GetAsJSONArray write SetAsJSONArray;
-    {$IFDEF USEBlob}
-    property AsStream: TStream read GetAsStream write SetAsStream;
-    {$ENDIF}
+    property AsStream: TStream read GetAsStream write SetAsStream; // 注意，返回的流需要释放
+    property AsBytes: TBytes read FValue write SetAsBytes;
     property Size: Cardinal read GetSize;
   end;
 
@@ -761,9 +767,8 @@ type
     procedure Put(const Key: JSONString; const Value: Variant); overload;
     procedure Put(const Key: JSONString; Value: JSONObject); overload;
     procedure Put(const Key: JSONString; Value: JSONArray); overload;
-    {$IFDEF USEBlob}
     procedure Put(const Key: JSONString; Value: TStream); overload;
-    {$ENDIF}
+    procedure Put(const Key: JSONString; const Value: TBytes); overload;
     procedure Put(const Key: JSONString; Value: array of const); overload;
     procedure PutDateTime(const Key: JSONString; Value: TDateTime);
 
@@ -805,10 +810,9 @@ type
     function GetVariant(const Key: JSONString): Variant;
     function GetJsonObject(const Key: JSONString): JSONObject;
     function GetJsonArray(const Key: JSONString): JSONArray;
-    {$IFDEF USEBlob}
-    function GetBlobStream(const Key: JSONString): TStream;
-    {$ENDIF}
-    
+    function GetStream(const Key: JSONString): TStream;  // 返回的流需要手动释放
+    function GetBytes(const Key: JSONString): TBytes;
+
     procedure SetByte(const Key: JSONString; Value: Byte);
     procedure SetBoolean(const Key: JSONString; const Value: Boolean);
     procedure SetDouble(const Key: JSONString; const Value: Double);
@@ -821,6 +825,8 @@ type
     procedure SetString(const Key, Value: JSONString);
     procedure SetVariant(const Key: JSONString; const Value: Variant);
     procedure SetDateTime(const Key: JSONString; const Value: TDateTime);
+    procedure SetStream(const Key: JSONString; const Value: TStream);
+    procedure SetBytes(const Key: JSONString; const Value: TBytes);
 
     // SuperJson 接口
     function Contains(const Key: JSONString): Boolean; {$IFDEF USEINLINE}inline;{$ENDIF}
@@ -833,6 +839,9 @@ type
     property A[const Key: JSONString]: JSONArray read GetJsonArray write SetJsonArray;
     property V[const Key: JSONString]: Variant read GetVariant write SetVariant;
     property T[const Key: JSONString]: TDateTime read GetDateTime write SetDateTime;
+
+    property Stream[const Key: JSONString]: TStream read GetStream write SetStream;
+    property Bytes[const Key: JSONString]: TBytes read GetBytes write SetBytes;
 
     // 不存在时会自动添加
     property Child[const Key: JSONString]: PJSONValue read GetChildItem; 
@@ -859,9 +868,8 @@ type
     procedure Add(const Value: array of const); overload;
     procedure Add(Value: JSONObject); overload;
     procedure Add(Value: JSONArray); overload;
-    {$IFDEF USEBlob}
     procedure Add(Value: TStream); overload;
-    {$ENDIF}
+    procedure Add(const Value: TBytes); overload;
     procedure AddDateTime(Value: TDateTime);
     // 添加JSON字符串，可以自动解析
     procedure AddJSON(const Value: JSONString; AType: JsonDataType = jdtUnknown); overload;
@@ -893,9 +901,8 @@ type
     function GetVariant(Index: Integer): Variant;
     function GetJsonObject(Index: Integer): JSONObject;
     function GetJsonArray(Index: Integer): JSONArray;
-    {$IFDEF USEBlob}
-    function GetBlobStream(Index: Integer): TStream;
-    {$ENDIF}
+    function GetStream(Index: Integer): TStream; // 返回的流需要手动释放
+    function GetBytes(Index: Integer): TBytes;
 
     procedure SetByte(Index: Integer; const Value: Byte);
     procedure SetBoolean(Index: Integer; const Value: Boolean);
@@ -908,7 +915,9 @@ type
     procedure SetJsonArray(Index: Integer; const Value: JSONArray);
     procedure SetJsonObject(Index: Integer; const Value: JSONObject);
     procedure SetString(Index: Integer; const Value: JSONString);
-    procedure SetVariant(Index: Integer; const Value: Variant);   
+    procedure SetVariant(Index: Integer; const Value: Variant);
+    procedure SetStream(Index: Integer; Value: TStream);
+    procedure SetBytes(Index: Integer; const Value: TBytes);
 
     property S[Index: Integer]: JSONString read GetString write SetString;
     property I[Index: Integer]: Int64 read GetInt64 write SetInt64;
@@ -918,6 +927,9 @@ type
     property A[Index: Integer]: JSONArray read GetJsonArray write SetJsonArray;
     property V[Index: Integer]: Variant read GetVariant write SetVariant;
     property T[Index: Integer]: TDateTime read GetDateTime write SetDateTime;
+
+    property Stream[Index: Integer]: TStream read GetStream write SetStream;
+    property Bytes[Index: Integer]: TBytes read GetBytes write SetBytes;
   end;
 
 const
@@ -1194,6 +1206,187 @@ function TPointerStream.Write(const Buffer; Count: Integer): Longint;
 begin
   raise Exception.Create('PointerStream Ban Written.');
 end;
+
+{$IFNDEF USEBase64}
+{$IFNDEF JSON_UNICODE}
+type
+  Base64String = AnsiString;
+const
+  Base64_Chars: array[0..63] of AnsiChar = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+  Base64_Bytes: array[0..79] of Byte =
+  (
+    62, 0, 0, 0, 63, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 0,
+    0, 0, 0, 0, 0, 0, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9,
+    10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25,
+    0, 0, 0, 0, 0, 0, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35,
+    36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51
+  );   
+type
+  Base64Proc = function(const Source; SourceSize: Integer; var Buf): Integer;
+
+function Base64Encode(const Source; SourceSize: Integer; var Base64Buf): Integer; overload;
+asm
+    push    ebp
+    push    esi
+    push    edi
+    push    ebx
+    mov     esi, eax         // esi = Source
+    mov     edi, ecx         // edi = Buf
+    mov     eax, edx
+    cdq
+    mov     ecx, 3
+    div     ecx              // edx = SourceSize % 3
+    mov     ecx, eax         // ecx = SourceSize / 3
+    test    edx, edx         
+    jz      @@1
+    inc     eax              // eax = (SourceSize + 2) / 3
+  @@1:
+    push    eax
+    push    edx
+    lea     ebp, Base64_Chars
+    jecxz   @Last
+    cld
+  @EncodeLoop:               //  while (ecx > 0){
+    mov     edx, [esi]       //   edx = 00000000 33333333 22222222 11111111
+    bswap   edx              //   edx = 11111111 22222222 33333333 00000000
+    push    edx
+    push    edx
+    push    edx
+    pop     ebx              //   ebx = edx
+    shr     edx, 20
+    shr     ebx, 26          //   ebx = 00111111
+    and     edx, 63          //   edx = 00112222
+    mov     ah, [ebp + edx]  //   *(word*)edi = (Base64_Chars[edx] << 8) |
+    mov     al, [ebp + ebx]  //     Base64_Chars[ebx]
+    stosw                    //   edi += 2
+    pop     edx              //   edx = 11111111 22222222 33333333 00000000
+    pop     ebx              //   ebx = edx
+    shr     edx, 8
+    shr     ebx, 14
+    and     edx, 63          //   edx = 00333333
+    and     ebx, 63          //   ebx = 00222233
+    mov     ah, [ebp + edx]  //   *(word*)edi = (Base64_Chars[edx] << 8) |
+    mov     al, [ebp + ebx]  //     Base64_Chars[ebx]
+    stosw                    //   edi += 2
+    add     esi, 3           //   esi += 3
+    loop    @EncodeLoop      // }
+  @Last:
+    pop     ecx              // ecx = SourceSize % 3
+    jecxz   @end             // if (ecx == 0) return
+    mov     eax, 3d3d0000h   // preset 2 bytes '='
+    mov     [edi], eax
+    test    ecx, 2
+    jnz     @@3
+    mov     al, [esi]        // if (ecx == 1)
+    shl     eax, 4           //   eax = *esi << 4
+    jmp     @@4
+  @@3:
+    mov     ax, [esi]        // else
+    xchg    al, ah           //   eax = ((*esi << 8) or *(esi + 1)) << 2
+    shl     eax, 2
+  @@4:
+    add     edi, ecx         // edi += ecx
+    inc     ecx              // ecx = last encode bytes
+  @LastLoop:
+    mov     edx, eax         // for (; cex > 0; ecx --, edi --)
+    and     edx, 63          // {
+    mov     dl, [ebp + edx]  //   edx = eax & 63
+    mov     [edi], dl        //   *edi = Base64_Chars[edx]
+    shr     eax, 6           //   eax >>= 6
+    dec     edi              // }
+    loop    @LastLoop
+  @end:
+    pop     eax
+    shl     eax, 2           // return  encode bytes
+    pop     ebx
+    pop     edi
+    pop     esi
+    pop     ebp
+end;
+
+function Base64Encode(const Source; SourceSize: Integer): Base64String; overload;
+begin
+  SetLength(Result, ((SourceSize + 2) div 3) shl 2);
+  Base64Encode(Source, SourceSize, Result[1]);
+end;
+
+function Base64DecodeBufSize(const Base64Source; SourceSize: Integer): Integer;
+asm
+    mov     ecx, eax    // ecx = Source + Size
+    add     ecx, edx
+    mov     eax, edx    // eax = Size / 4 * 3
+    shr     edx, 2
+    shr     eax, 1
+    add     eax, edx
+    mov     edx, eax
+    jz      @@2
+  @@1:
+    dec     ecx
+    cmp     byte ptr [ecx], 61
+    jne     @@2         // if (*--ecx == '=')
+    dec     eax         //   eax --
+    jmp     @@1
+  @@2:                  // return eax: BufSize;  edx: Size / 4 * 3
+end;
+
+function Base64Decode(const Base64Source; SourceSize: Integer; var Buf): Integer; overload;
+asm
+    push    ebp
+    push    esi
+    push    edi
+    push    ebx
+    mov     esi, eax       // esi = Source
+    mov     edi, ecx       // edi = Buf
+    mov     ebx, edx
+    call    Base64DecodeBufSize
+    push    eax            // eax = Base64DecodeBufSize(Source, SourceSize)
+    sub     edx, eax       // edx -= eax  // edx: '=' count
+    lea     ebp, Base64_Bytes
+    shr     ebx, 2         // ebx = SourceSize / 4
+    test    ebx, ebx
+    jz      @end
+    push    edx
+    cld
+  @DecodeLoop:             // for (; ebx > 0; ebx --; edi += 3)
+    mov     ecx, 4         // {
+    xor     eax, eax
+  @xchgLoop:               //   for (ecx = 4, eax = 0; ecx > 0; ecx --)
+    movzx   edx, [esi]     //   {
+    sub     edx, 43        //      edx = *(int*)esi - 43
+    shl     eax, 6         //      eax <<= 6
+    or      al, [ebp + edx]//      al |= Base64_Bytes[edx]
+    inc     esi            //      esi ++
+    loop    @xchgLoop      //   }
+    bswap   eax            //   bswap(eax)
+    dec     ebx            //   if (ebx == 1) break
+    jz      @Last
+    shr     eax, 8         //   eax >>= 8
+    stosw                  //   *edi = ax; edi += 2
+    shr     eax, 16        //   eax >>= 16
+    stosb                  //   *edi++ = al
+    jmp     @DecodeLoop    // }
+  @Last:
+    pop     ecx            
+    xor     ecx, 3         // ecx = last bytes
+  @LastLoop:               // for (; ecx > 0; ecx --)
+    shr     eax, 8         // {
+    stosb                  //   eax >>= 8; *edi ++ = al
+    loop    @LastLoop      // }
+  @end:
+    pop     eax            // return eax
+    pop     ebx
+    pop     edi
+    pop     esi
+    pop     ebp
+end;
+
+function Base64Decode(const Base64Source; SourceSize: Integer): string; overload;
+begin
+  SetLength(Result, Base64DecodeBufSize(Base64Source, SourceSize));
+  Base64Decode(Base64Source, SourceSize, Result[1]);
+end;  
+{$ENDIF}
+{$ENDIF}
 
 {$IFNDEF USEYxdStr}
 //计算当前字符的长度
@@ -3230,7 +3423,6 @@ begin
   end;
 end;
 
-{$IFDEF USEBlob}
 {$IFNDEF USERTTI}
 const
   CSBlobs: JSONString = '[blob]<';
@@ -3280,7 +3472,9 @@ end;
 function BlobStringToStream(Data: Pointer; Size: Integer): TMemoryStream; overload;
 var
   I: Integer;
+  {$IFDEF JSON_UNICODE}
   BSStream: TPointerStream;
+  {$ENDIF}
   p: {$IFDEF JSON_UNICODE}PByte{$ELSE}PAnsiChar{$ENDIF};
   {$IFNDEF JSON_UNICODE}
   BStmp: JSONString;
@@ -3347,27 +3541,14 @@ begin
   {$ENDIF}
 end;
 
-function BlobStreamToString(Data: TStream; Base64Blob: Boolean): JSONString; overload;
-var
-  M: TMemoryStream;
+function BlobStreamToString(const Data: TBytes; Base64Blob: Boolean): JSONString; overload; {$IFDEF USEINLINE}inline;{$ENDIF}
 begin
-  if Assigned(Data) then begin
-    if (Data is TMemoryStream) then
-      Result := BlobStreamToString(TMemoryStream(Data).Memory, Data.Size, Base64Blob)
-    else begin
-      M := TMemoryStream.Create;
-      try
-        M.LoadFromStream(Data);
-        Result := BlobStreamToString(M.Memory, M.Size, Base64Blob);
-      finally
-        M.Free;
-      end;
-    end;
+  if Length(Data) > 0 then begin
+    Result := BlobStreamToString(@Data[0], Length(Data), Base64Blob)
   end else
     Result := '';
 end;
 {$ENDIF} 
-{$ENDIF}
 
 { JSONValue }
 
@@ -3375,23 +3556,16 @@ procedure JSONValue.CopyValue(ASource: PJSONValue);
 var
   l: Integer;
 begin
-  {$IFDEF USEBlob}
-  if ASource.FType = jdtBlob then
-    SetVariantToStream(ASource.AsVariant)
-  else
-  {$ENDIF}
-  begin
-    L := Length(ASource.FValue);
-    FType := ASource.FType;
-    SetLength(FValue, L);
-    if L > 0 then
-      Move(ASource.FValue[0], FValue[0], L);
-  end;
+  L := Length(ASource.FValue);
+  FType := ASource.FType;
+  SetLength(FValue, L);
+  if L > 0 then
+    Move(ASource.FValue[0], FValue[0], L);
 end;
 
 procedure JSONValue.Free;
 begin
-  if ((FType = jdtObject){$IFDEF USEBlob} or (FType = jdtBlob){$ENDIF}) and (FObject <> nil) then
+  if (FType = jdtObject) and (FObject <> nil) then
     FObject.Free;
 end;
 
@@ -3409,9 +3583,6 @@ begin
       jdtInteger: Result := AsInt64 <> 0;
       jdtObject: Result := FObject <> nil;
       jdtFloat, jdtDateTime: Result := AsFloat <> 0;
-      {$IFDEF USEBlob}
-      jdtBlob: Result := FObject <> nil;
-      {$ENDIF}
     else
       Result := PBoolean(@FValue[0])^;
     end;
@@ -3515,7 +3686,7 @@ end;
 
 function JSONValue.GetAsJSONArray: JSONArray;
 begin
-  if (FObject <> nil) {$IFDEF USEBlob}and (FType <> jdtBlob){$ENDIF} and (FObject.GetIsArray) then
+  if (FObject <> nil) and (FObject.GetIsArray) then
     Result := JSONArray(FObject)
   else
     Result := nil;
@@ -3523,25 +3694,26 @@ end;
 
 function JSONValue.GetAsJSONObject: JSONObject;
 begin
-  if (FObject <> nil) {$IFDEF USEBlob}and (FType <> jdtBlob){$ENDIF} and (not FObject.GetIsArray) then
+  if (FObject <> nil) and (not FObject.GetIsArray) then
     Result := JSONObject(FObject)
   else
     Result := nil;
 end;
 
-{$IFDEF USEBlob}
 function JSONValue.GetAsStream: TStream;
+
+  function GetPointerStream(const Value: TBytes): TPointerStream;
+  begin
+    Result := TPointerStream.Create();
+    if Length(Value) > 0 then
+      Result.SetPointer(@Value[0], Length(Value));
+  end;
+
 begin
-  if (FObject <> nil) and (FType = jdtBlob) then
-    Result := TStream(FObject)
-  else if (FType = jdtString) and (Length(FValue) > 4) and {$IFDEF USERTTI}TYxdSerialize.{$ELSE}YxdJson.{$ENDIF}IsBlob(@FValue[0], High(FValue)) then begin
-    Result := {$IFDEF USERTTI}TYxdSerialize.{$ENDIF}BlobStringToStream(@FValue[0], Length(FValue));
-    if Assigned(Result) then
-      AsStream := Result;
-  end else
-    Result := nil;
+  if (FType = jdtString) and (Length(FValue) > 4) then
+    ParseBlobData();
+  Result := GetPointerStream(FValue);
 end;
-{$ENDIF}
 
 function JSONValue.GetAsString: JSONString;
 begin
@@ -3560,6 +3732,21 @@ begin
       Result := string(LoadTextA(Stream, AEncoding));
     finally
       FreeAndNil(Stream);
+    end;
+  end;
+end;
+
+function JSONValue.ParseBlobData: boolean;
+var
+  S: TMemoryStream;
+begin
+  Result := False;
+  if {$IFDEF USERTTI}TYxdSerialize.{$ELSE}YxdJson.{$ENDIF}IsBlob(@FValue[0], High(FValue)) then begin
+    S := {$IFDEF USERTTI}TYxdSerialize.{$ENDIF}BlobStringToStream(@FValue[0], Length(FValue));
+    if Assigned(S) then begin
+      SetBytes(S.Memory, S.Position);
+      Result := True;
+      FreeAndNil(S);
     end;
   end;
 end;
@@ -3596,17 +3783,15 @@ begin
   Result := GetAsInt64;
 end;
 
-{$IFDEF USEBlob}
 function JSONValue.GetIsBlob: Boolean;
 begin
-  if (FObject <> nil) and (FType = jdtBlob) then
+  if (FType = jdtBytes) then
     Result := True
   else if (FType = jdtString) and (Length(FValue) > 4) and {$IFDEF USERTTI}TYxdSerialize.{$ELSE}YxdJson.{$ENDIF}IsBlob(@FValue[0], High(FValue)) then begin
     Result := True
   end else
-    Result := False;  
+    Result := False;
 end;
-{$ENDIF}
 
 function JSONValue.GetIsDateTime: Boolean;
 var
@@ -3665,6 +3850,12 @@ begin
   FType := jdtInteger;
 end;
 
+procedure JSONValue.SetAsBytes(const Value: TBytes);
+begin
+  FValue := Value;
+  FType := jdtBytes;
+end;
+
 procedure JSONValue.SetAsDateTime(const Value: TDateTime);
 begin
   SetLength(FValue, SizeOf(Value));
@@ -3721,14 +3912,10 @@ begin
   FType := jdtObject;
 end;
 
-{$IFDEF USEBlob}
 procedure JSONValue.SetAsStream(const Value: TStream);
 begin
-  SetLength(FValue, 0);
-  FObject := JSONBase(Value);
-  Ftype := jdtBlob;
+  SetBytes(Value);
 end;
-{$ENDIF}
 
 procedure JSONValue.SetAsString(const Value: JSONString);
 begin
@@ -3804,7 +3991,37 @@ begin
   FType := jdtInteger;
 end;
 
-{$IFDEF USEBlob}
+procedure JSONValue.SetBytes(Source: TStream; IsAll: Boolean);
+var
+  LastPosition: Int64;
+begin
+  if Assigned(Source) then begin
+    if IsAll then begin
+      SetLength(FValue, Source.Size);
+      if Length(FValue) > 0 then begin
+        Source.Position := 0;
+        Source.ReadBuffer((@FValue[0])^, Length(FValue));
+      end;
+    end else begin
+      LastPosition := Source.Position;
+      SetLength(FValue, Source.Size - LastPosition);
+      if Length(FValue) > 0 then
+        Source.ReadBuffer((@FValue[0])^, Length(FValue));
+      Source.Position := LastPosition;
+    end;
+  end else
+    SetLength(FValue, 0);
+  FType := jdtBytes;
+end;
+
+procedure JSONValue.SetBytes(const Data: Pointer; ASize: NativeInt);
+begin
+  SetLength(FValue, ASize);
+  if ASize > 0 then
+    Move(Data^, FValue[0], ASize);
+  FType := jdtBytes;
+end;
+
 procedure JSONValue.SetVariantToStream(const Value: Variant);
 var
   S: TMemoryStream;
@@ -3819,7 +4036,6 @@ function JSONValue.GetVariantFormStream(): Variant;
 begin
   Result := ReadVarArrayFromStream(AsStream);
 end;
-{$ENDIF}
 
 {$IFDEF JSON_RTTI}
 function JSONValue.ToObjectValue: TValue;
@@ -3900,10 +4116,8 @@ begin
       Result := JSONBase.Encode(FObject, AIndent, ADoEscape);
     jdtDateTime:
       Result := ValueAsDateTime(JsonDateFormat, JsonTimeFormat, JsonDateTimeFormat, AsDateTime);
-    {$IFDEF USEBlob}
-    jdtBlob:
-      Result := {$IFDEF USERTTI}TYxdSerialize.{$ENDIF}BlobStreamToString(AsStream, JsonBlobBase64);
-    {$ENDIF}
+    jdtBytes:
+      Result := {$IFDEF USERTTI}TYxdSerialize.{$ENDIF}BlobStreamToString(AsBytes, JsonBlobBase64);
     jdtNull, jdtUnknown:
       Result := 'null';
   end;
@@ -4543,14 +4757,12 @@ class function JSONBase.InternalEncode(Obj: JSONBase; ABuilder: TStringCatHelper
               ABuilder.Cat(CharStringEnd, 1);
               ABuilder.Cat(CharComma, 1);
             end;
-          {$IFDEF USEBlob}
-          jdtBlob:
+          jdtBytes:
             begin
               ABuilder.Cat(CharStringStart, 1);
               CatValue(ABuilder, Item.AsString, ADoEscape);
               ABuilder.Cat(CharStringEnd, 2);
             end;
-          {$ENDIF}
           jdtNull, jdtUnknown:
             ABuilder.Cat(CharNull, 5);
         end;
@@ -5833,12 +6045,10 @@ begin
   AddChildArray(Key, Value);
 end;
 
-{$IFDEF USEBlob}
 procedure JSONObject.Put(const Key: JSONString; Value: TStream);
 begin
-  Add(Key).AsStream := Value;
+  Add(Key).SetBytes(Value);
 end;
-{$ENDIF}
 
 procedure JSONObject.put(const key: JSONString; value: JSONObject);
 var
@@ -5985,6 +6195,15 @@ begin
     Result := 0;
 end;
 
+function JSONObject.GetBytes(const Key: JSONString): TBytes;
+var
+  Item: PJSONValue;
+begin
+  Item := getItem(key);
+  if Item <> nil then
+    Result := Item.AsBytes;
+end;
+
 function JSONObject.getDateTime(const key: JSONString): TDateTime;
 var
   Item: PJSONValue;
@@ -6092,8 +6311,7 @@ begin
     Result := nil;
 end;
 
-{$IFDEF USEBlob}
-function JSONObject.GetBlobStream(const Key: JSONString): TStream;
+function JSONObject.GetStream(const Key: JSONString): TStream;
 var
   Item: PJSONValue;
 begin
@@ -6103,7 +6321,6 @@ begin
   else
     Result := nil;
 end;
-{$ENDIF}
 
 function JSONObject.getString(const key: JSONString): JSONString;
 var
@@ -6364,6 +6581,11 @@ begin
   Add(Key).AsDouble := value;
 end;
 
+procedure JSONObject.Put(const Key: JSONString; const Value: TBytes);
+begin
+  Add(Key).AsBytes := Value;
+end;
+
 procedure JSONObject.putDateTime(const key: JSONString; value: TDateTime);
 begin
   Add(Key).AsDateTime := value;
@@ -6379,6 +6601,12 @@ procedure JSONObject.SetByte(const Key: JSONString; Value: Byte);
 begin
   if Length(Key) > 0 then   
     GetChildItem(Key).AsByte := Value;
+end;
+
+procedure JSONObject.SetBytes(const Key: JSONString; const Value: TBytes);
+begin
+  if Length(Key) > 0 then
+    GetChildItem(Key).AsBytes := Value;
 end;
 
 procedure JSONObject.SetDateTime(const Key: JSONString; const Value: TDateTime);
@@ -6422,6 +6650,12 @@ procedure JSONObject.SetJsonObject(const Key: JSONString;
 begin
   if Length(Key) > 0 then   
     GetChildItem(Key).AsJsonObject := Value;
+end;
+
+procedure JSONObject.SetStream(const Key: JSONString; const Value: TStream);
+begin
+  if Length(Key) > 0 then
+    GetChildItem(Key).AsStream := Value;
 end;
 
 procedure JSONObject.SetString(const Key, Value: JSONString);
@@ -6512,12 +6746,15 @@ begin
   value.FValue := item;
 end;
 
-{$IFDEF USEBlob}
 procedure JSONArray.Add(Value: TStream);
 begin
-  NewJsonValue().AsStream := Value;
+  NewJsonValue().SetBytes(Value);
 end;
-{$ENDIF}
+
+procedure JSONArray.Add(const Value: TBytes);
+begin
+  NewJsonValue().AsBytes := Value;
+end;
 
 procedure JSONArray.Add(const Value: array of const);
 begin
@@ -6601,19 +6838,6 @@ begin
   Result.Assign(Self);
 end;
 
-{$IFDEF USEBlob}
-function JSONArray.GetBlobStream(Index: Integer): TStream;
-var
-  Item: PJSONValue;
-begin
-  Item := FItems[index];
-  if Item <> nil then
-    Result := Item.AsStream
-  else
-    Result := nil;
-end;
-{$ENDIF}
-
 function JSONArray.getBoolean(Index: Integer): Boolean;
 var
   Item: PJSONValue;
@@ -6634,6 +6858,15 @@ begin
     Result := Item.AsByte
   else
     Result := 0;
+end;
+
+function JSONArray.GetBytes(Index: Integer): TBytes;
+var
+  Item: PJSONValue;
+begin
+  Item := FItems[index];
+  if Item <> nil then
+    Result := Item.AsBytes
 end;
 
 function JSONArray.getDateTime(Index: Integer): TDateTime;
@@ -6729,6 +6962,17 @@ begin
     Result := nil;
 end;
 
+function JSONArray.GetStream(Index: Integer): TStream;
+var
+  Item: PJSONValue;
+begin
+  Item := FItems[index];
+  if Item <> nil then
+    Result := Item.AsStream
+  else
+    Result := nil;
+end;
+
 function JSONArray.getString(Index: Integer): JSONString;
 var
   Item: PJSONValue;
@@ -6812,6 +7056,14 @@ begin
     FItems[index].AsByte := Value;
 end;
 
+procedure JSONArray.SetBytes(Index: Integer; const Value: TBytes);
+begin
+  if (Index < 0) or (Index >= Count) then
+    Add(Value)
+  else
+    FItems[index].AsBytes := Value;
+end;
+
 procedure JSONArray.SetDateTime(Index: Integer; const Value: TDateTime);
 begin
   if (Index < 0) or (Index >= Count) then
@@ -6866,6 +7118,14 @@ begin
     Add(Value)
   else 
     FItems[index].AsJsonObject := Value;
+end;
+
+procedure JSONArray.SetStream(Index: Integer; Value: TStream);
+begin
+  if (Index < 0) or (Index >= Count) then
+    Add(Value)
+  else
+    FItems[index].AsStream := Value;
 end;
 
 procedure JSONArray.SetString(Index: Integer; const Value: JSONString);
@@ -7159,14 +7419,11 @@ begin
 end;
 {$ENDIF}
 
-
 initialization
-{$IFDEF USEBlob}
 {$IFNDEF USERTTI}
   CSPBlobs := PJSONChar(CSBlobs);
   CSPBlobs2 := CSPBlobs + 4;
   CSPBlobs3 := CSPBlobs2 + 2;
-{$ENDIF}
 {$ENDIF}
 
 finalization

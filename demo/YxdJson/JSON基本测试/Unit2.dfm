@@ -27,10 +27,6 @@ object Form2: TForm2
     TabOrder = 0
     object TabSheet1: TTabSheet
       Caption = #28304'JSON'#25968#25454
-      ExplicitLeft = 0
-      ExplicitTop = 0
-      ExplicitWidth = 0
-      ExplicitHeight = 0
       object Memo1: TMemo
         AlignWithMargins = True
         Left = 3
@@ -85,10 +81,6 @@ object Form2: TForm2
     end
     object TabSheet2: TTabSheet
       Caption = #36755#20986#32467#26524
-      ExplicitLeft = 0
-      ExplicitTop = 0
-      ExplicitWidth = 0
-      ExplicitHeight = 0
       object Memo2: TMemo
         AlignWithMargins = True
         Left = 3
@@ -111,10 +103,6 @@ object Form2: TForm2
     end
     object TabSheet3: TTabSheet
       Caption = #26085#24535
-      ExplicitLeft = 0
-      ExplicitTop = 0
-      ExplicitWidth = 0
-      ExplicitHeight = 0
       object ListBox1: TListBox
         AlignWithMargins = True
         Left = 3
@@ -326,7 +314,7 @@ object Form2: TForm2
   end
   object OpenDialog1: TOpenDialog
     Filter = '*.json|*.json;*.txt|*.*|*.*'
-    Left = 432
-    Top = 128
+    Left = 576
+    Top = 136
   end
 end

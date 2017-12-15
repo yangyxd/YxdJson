@@ -226,6 +226,7 @@ type
     /// </summary>
     class function BlobStreamToString(const Data: Pointer; const Size: Int64; Base64Blob: Boolean = True): JSONString; overload;
     class function BlobStreamToString(Data: TStream; Base64Blob: Boolean = True): JSONString; overload;
+    class function BlobStreamToString(const Data: TBytes; Base64Blob: Boolean = True): JSONString; overload;
 
     // 判断字符串是否是Blob数据
     class function IsBlob(P: PJSONChar; HighL: Integer): Boolean;
@@ -919,7 +920,7 @@ class procedure TYxdSerialize.Serialize(Writer: TSerializeWriter; AJson: JSONBas
               else
                 Writer.WriteString(Item.FName, Item.ToString)
             end;
-          jdtBlob:
+          jdtBytes:
             begin
               Writer.WriteString(Item.FName, Item.AsString);
             end;
@@ -1145,6 +1146,15 @@ begin
         M.Free;
       end;
     end;
+  end else
+    Result := '';
+end;
+
+class function TYxdSerialize.BlobStreamToString(const Data: TBytes;
+  Base64Blob: Boolean): JSONString;
+begin
+  if Length(Data) > 0 then begin
+    Result := BlobStreamToString(@Data[0], Length(Data), Base64Blob)
   end else
     Result := '';
 end;
