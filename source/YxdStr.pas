@@ -115,10 +115,13 @@ type
     procedure SetPosition(const Value: Integer);
     procedure NeedSize(ASize:Integer);
     function GetLast: PChar;
+    procedure SetDest(const Value: PChar);
+    function GetEndChar: PChar;
   public
     constructor Create; overload;
     constructor Create(ASize: Integer); overload;
     destructor Destroy; override;
+    procedure IncSize(const V: Integer);
     function Cat(p: PChar; len: Integer): TStringCatHelper; overload;
     function Cat(const s: string): TStringCatHelper; overload;
     function Cat(c: Char): TStringCatHelper; overload;
@@ -130,6 +133,7 @@ type
     function Cat(const V:Variant): TStringCatHelper;overload;
     function Cat(const V:TStream): TStringCatHelper;overload;
     function Space(count: Integer): TStringCatHelper;
+    function Replicate(const V: string; Count: Integer = 1): TStringCatHelper;
     function Back(ALen: Integer): TStringCatHelper;
     function BackIf(const s: PChar): TStringCatHelper;
     procedure Reset;
@@ -137,8 +141,9 @@ type
     property Value: string read GetValue;
     property Chars[Index: Integer]: Char read GetChars;
     property Start: PChar read FStart;
-    property Current: PChar read FDest;
+    property Current: PChar read FDest write SetDest;
     property Last: PChar read GetLast;
+    property EndChar: PChar read GetEndChar;
     property Position: Integer read GetPosition write SetPosition;
   end;
 
@@ -370,6 +375,10 @@ var
   // 按照Java格式编码，将#$0字符编码为#$C080
   JavaFormatUtf8: Boolean = True;
 {$ENDIF}
+
+const
+  LowerHexChars: array [0 .. 15] of Char = ('0', '1', '2', '3', '4', '5', '6',
+    '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f');
 
 implementation
 
@@ -2374,6 +2383,11 @@ begin
   Result := FStart[AIndex];
 end;
 
+function TStringCatHelper.GetEndChar: PChar;
+begin
+  Result := FStart + FSize;
+end;
+
 function TStringCatHelper.GetLast: PChar;
 begin
   if FDest > FStart then
@@ -2396,6 +2410,11 @@ begin
   Move(FStart^, PChar(Result)^, L{$IFDEF UNICODE} shl 1{$ENDIF});
 end;
 
+procedure TStringCatHelper.IncSize(const V: Integer);
+begin
+  NeedSize(-V);
+end;
+
 procedure TStringCatHelper.NeedSize(ASize: Integer);
 var
   offset:Integer;
@@ -2408,6 +2427,25 @@ begin
     SetLength(FValue, FSize);
     FStart := PChar(@FValue[0]);
     FDest := FStart + offset;
+  end;
+end;
+
+function TStringCatHelper.Replicate(const V: string;
+  Count: Integer): TStringCatHelper;
+var
+  ps: PChar;
+  l: Integer;
+begin
+  Result := Self;
+  if count > 0 then begin
+    ps := PChar(V);
+    l := Length(V);
+    NeedSize(-(l * Count));
+    while count > 0 do begin
+      Move(ps^, FDest^, l{$IFDEF UNICODE} shl 1{$ENDIF});
+      Inc(FDest, l);
+      Dec(count);
+    end;
   end;
 end;
 
@@ -2435,6 +2473,16 @@ begin
     end;
   end;
 {$ENDIF}
+end;
+
+procedure TStringCatHelper.SetDest(const Value: PChar);
+begin
+  if Value < FStart then
+    FDest := FStart
+  else if (Value - FStart) > FSize then
+    FDest := FStart + FSize
+  else
+    FDest := Value;
 end;
 
 procedure TStringCatHelper.SetPosition(const Value: Integer);

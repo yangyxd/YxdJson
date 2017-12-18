@@ -17,6 +17,11 @@
  --------------------------------------------------------------------
   更新记录
  --------------------------------------------------------------------
+ ver 1.0.23 2017.12.18
+ --------------------------------------------------------------------
+  * 优化 CatValue 代码，大幅提升ToString性能
+  
+ --------------------------------------------------------------------
  ver 1.0.22 2017.12.15
  --------------------------------------------------------------------
   * 今天是个好日子
@@ -626,6 +631,7 @@ type
     class function ParseObject(const Text: JSONString; RaiseError: Boolean = True): JSONObject; overload;
     // 解析指定的JSON字符串
     class function ParseArray(const Text: JSONString; RaiseError: Boolean = True): JSONArray; overload;
+    class procedure CatJson(ABuilder: TStringCatHelper; const AValue: JSONString; ADoEscape: Boolean);
 
     /// <summary>
     /// 序列化
@@ -959,7 +965,7 @@ var
   //日期时间类型转换为Json数据时会转换成字符串，这个变量控制如何格式化
   JsonDateTimeFormat: JSONString = 'yyyy-mm-dd hh:nn:ss.zzz';
   //浮点数精度
-  JsonFloatDigits: Integer = 6;
+  JsonFloatDigits: Integer = 8;
   //Json 严格模式下日期类型的精度，默认为毫秒，可以设置为秒以便与某些系统兼容
   JsonDatePrecision: TJsonDatePrecision = jdpMillisecond;
   //Json 日期时间格式化样式
@@ -1129,9 +1135,11 @@ const
   CharComma:        PJSONChar = ',';
   CharNum0:         PJSONChar = '0';
   CharNum1:         PJSONChar = '1';
-  Char7:            PJSONChar = '\b';
+  Char7:            PJSONChar = '\a';
+  Char8:            PJSONChar = '\b';
   Char9:            PJSONChar = '\t';
   Char10:           PJSONChar = '\n';
+  Char11:           PJSONChar = '\v';
   Char12:           PJSONChar = '\f';
   Char13:           PJSONChar = '\r';
   CharQuoter:       PJSONChar = '\"';
@@ -3333,53 +3341,122 @@ begin
 end;
 {$ENDIF} {$ENDIF}
 
+type
+  {$IFDEF JSON_UNICODE}
+  PIntChar = PInteger;
+  PInt4Char = PInt64;
+  {$ELSE}
+  PIntChar = PWord;
+  PInt4Char = PInteger;
+  {$ENDIF}
+
 procedure CatValue(ABuilder: TStringCatHelper; const AValue: JSONString; ADoEscape: Boolean);
 var
-  ps: PJSONChar;
-  {$IFNDEF JSON_UNICODE}w: Word;{$ENDIF}
+  ps, p: PJSONChar;
+  pd, pLast: PChar;
+  ADelta: Integer;
+  w: Word;
 begin
+  ABuilder.IncSize(Length(AValue));
   ps := PJSONChar(AValue);
-  while ps^ <> #0 do begin
-    case ps^ of
-      #7:   ABuilder.Cat(Char7, 2);
-      #9:   ABuilder.Cat(Char9, 2);
-      #10:  ABuilder.Cat(Char10, 2);
-      #12:  ABuilder.Cat(Char12, 2);
-      #13:  ABuilder.Cat(Char13, 2);
-      '\':  ABuilder.Cat(CharBackslash, 2);
-      '"':  ABuilder.Cat(CharQuoter, 2);
+  p := ps;
+  pd := ABuilder.Current;
+  pLast := ABuilder.EndChar;
+  while p^ <> #0 do begin
+    if IntPtr(pLast) - IntPtr(pd) < 12 then begin // 最糟糕的情况是 \uxxxx
+      ABuilder.Current := pd;
+      ADelta := Length(AValue) - ((IntPtr(p) - IntPtr(ps)) shr 1);
+      // 如果是剩下一个需转义字符，且ADoEscape为true，则至少需要6个字符的位置
+      if ADoEscape and (ADelta < 6) then
+        ADelta := 6;
+      ABuilder.IncSize(ADelta);
+      pd := ABuilder.Current;
+      pLast := ABuilder.EndChar;
+      ps := p;
+    end;
+
+    case p^ of
+      #7:
+        begin
+          PIntChar(pd)^ := PIntChar(Char7)^;
+          Inc(pd, 2);
+        end;
+      #8:
+        begin
+          PIntChar(pd)^ := PIntChar(Char8)^;
+          Inc(pd, 2);
+        end;
+      #9:
+        begin
+          PIntChar(pd)^ := PIntChar(Char9)^;
+          Inc(pd, 2);
+        end;
+      #10:
+        begin
+          PIntChar(pd)^ := PIntChar(Char10)^;
+          Inc(pd, 2);
+        end;
+      #11:
+        begin
+          PIntChar(pd)^ := PIntChar(Char11)^;
+          Inc(pd, 2);
+        end;
+      #12:
+        begin
+          PIntChar(pd)^ := PIntChar(Char12)^;
+          Inc(pd, 2);
+        end;
+      #13:
+        begin
+          PIntChar(pd)^ := PIntChar(Char13)^;
+          Inc(pd, 2);
+        end;
+      '\':
+        begin
+          PIntChar(pd)^ := PIntChar(CharBackslash)^;
+          Inc(pd, 2);
+        end;
+      '"':
+        begin
+          PIntChar(pd)^ := PIntChar(CharQuoter)^;
+          Inc(pd, 2);
+        end;
       else begin
         if ps^ < #$1F then begin
-          ABuilder.Cat(CharCode, 4);
+          PInt4Char(pd)^ := PInt4Char(CharCode)^;
+          Inc(pd, 4);
           if ps^ > #$F then
-            ABuilder.Cat(CharNum1, 1)
+            pd^ := CharNum1^
           else
-            ABuilder.Cat(CharNum0, 1);
-          ABuilder.Cat(HexChar(Ord(ps^) and $0F));
-        end else if (ps^ <= #$7E) or (not ADoEscape) then//英文字符区
-          ABuilder.Cat(ps, 1)
-        else
+            pd^ := CharNum0^;
+          Inc(pd);
+          pd^ := LowerHexChars[Ord(p^) and $0F];
+          Inc(pd);
+        end else if (ps^ <= #$7E) or (not ADoEscape) then begin//英文字符区
+          pd^ := p^;
+          Inc(pd);
+        end else begin
+          PIntChar(pd)^ := PIntChar(CharEscape)^;
+          Inc(pd, 2);
           {$IFDEF JSON_UNICODE}
-          ABuilder.Cat(CharEscape, 2).Cat(
-            HexChar((PWord(ps)^ shr 12) and $0F)).Cat(
-            HexChar((PWord(ps)^ shr 8) and $0F)).Cat(
-            HexChar((PWord(ps)^ shr 4) and $0F)).Cat(
-            HexChar(PWord(ps)^ and $0F));
+          w := PWord(p)^;
           {$ELSE}
-          begin
           w := PWord(AnsiDecode(ps, 2))^;
-          ABuilder.Cat(CharEscape, 2).Cat(
-            HexChar((w shr 12) and $0F)).Cat(
-            HexChar((w shr 8) and $0F)).Cat(
-            HexChar((w shr 4) and $0F)).Cat(
-            HexChar(w and $0F));
-          Inc(ps);
-          end;
           {$ENDIF}
+          pd^ := LowerHexChars[(w shr 12) and $0F];
+          Inc(pd);
+          pd^ := LowerHexChars[(w shr 8) and $0F];
+          Inc(pd);
+          pd^ := LowerHexChars[(w shr 4) and $0F];
+          Inc(pd);
+          pd^ := LowerHexChars[w and $0F];
+          Inc(pd);
+        end;
       end;
     end;
-    Inc(ps);
+    Inc(p);
   end;
+  ABuilder.Current := pd;
 end;
 
 procedure StrictJsonTime(ABuilder: TStringCatHelper; ATime:TDateTime);
@@ -4686,6 +4763,8 @@ end;
 
 class function JSONBase.InternalEncode(Obj: JSONBase; ABuilder: TStringCatHelper;
   AIndent: Integer; ADoEscape: Boolean): TStringCatHelper;
+var
+  AIndentStr: JSONString;
 
   procedure DoEncode(ANode: JSONBase; ALevel: Integer);
   var
@@ -4706,7 +4785,8 @@ class function JSONBase.InternalEncode(Obj: JSONBase; ABuilder: TStringCatHelper
         if Item = nil then Continue;
         if (AIndent > 0) then begin
           ABuilder.Cat(SLineBreak);
-          ABuilder.Space(AIndent * (ALevel + 1));
+          //ABuilder.Space(AIndent * (ALevel + 1));
+          ABuilder.Replicate(AIndentStr, ALevel + 1);
         end;
         if Length(item.FName) > 0 then begin
           ABuilder.Cat(CharStringStart, 1);
@@ -4727,7 +4807,7 @@ class function JSONBase.InternalEncode(Obj: JSONBase; ABuilder: TStringCatHelper
           jdtString:
             begin
               ABuilder.Cat(CharStringStart, 1);
-              CatValue(ABuilder, Item.AsString, ADoEscape);
+              CatValue(ABuilder, Item.GetString, ADoEscape);
               ABuilder.Cat(CharStringEnd, 2);
             end;
           jdtInteger:
@@ -4758,7 +4838,7 @@ class function JSONBase.InternalEncode(Obj: JSONBase; ABuilder: TStringCatHelper
           jdtBytes:
             begin
               ABuilder.Cat(CharStringStart, 1);
-              CatValue(ABuilder, Item.AsString, ADoEscape);
+              CatValue(ABuilder, Item.ToString(0), ADoEscape);
               ABuilder.Cat(CharStringEnd, 2);
             end;
           jdtNull, jdtUnknown:
@@ -4776,7 +4856,8 @@ class function JSONBase.InternalEncode(Obj: JSONBase; ABuilder: TStringCatHelper
 
     if AIndent > 0 then begin
       ABuilder.Cat(SLineBreak);
-      ABuilder.Space(AIndent * ALevel);
+      //ABuilder.Space(AIndent * ALevel);
+      ABuilder.Replicate(AIndentStr, ALevel + 1);
     end;
 
     if IsArray then begin
@@ -4785,8 +4866,23 @@ class function JSONBase.InternalEncode(Obj: JSONBase; ABuilder: TStringCatHelper
       ABuilder.Cat(CharObjectEnd, 2);
     end;
   end;
+
+  function SpaceStr(const L: Integer): JSONString;
+  var
+    P, PE: PJSONChar;
+  begin
+    SetLength(Result, L);
+    P := PJSONChar(Result);
+    PE := P + L;
+    while P < PE do begin
+      P^ := ' ';
+      Inc(P);
+    end;
+  end;
+
 begin
   Result := ABuilder;
+  AIndentStr := SpaceStr(AIndent);
   DoEncode(Obj, 0);
 end;
 
@@ -5000,6 +5096,8 @@ function JSONBase.ParseValue(ABuilder: TStringCatHelper;
   var p: PJSONChar; const FName: JSONString): Integer;
 const
   JsonEndChars: PJSONChar = ',}]';
+  MaxInt64: Int64 = 9223372036854775807;
+  MinInt64: Int64 = -9223372036854775808;
 var
   ANum: Extended;
 begin
@@ -5017,10 +5115,10 @@ begin
   end else if ParseNumeric(p, ANum) then begin //数字？
     {$IFDEF JSON_UNICODE}SkipSpaceW{$ELSE}SkipSpaceA{$ENDIF}(p);
     if (p^ = #0) or {$IFDEF JSON_UNICODE}CharInW{$ELSE}CharInA{$ENDIF}(p, JsonEndChars) then begin
-      if SameValue(ANum, Trunc(ANum)) then
-        JSONObject(Self).put(FName, Trunc(ANum))
+      if (ANum >= MinInt64) and (ANum <= MaxInt64) and SameValue(ANum, Trunc(ANum), 5E-324) then
+        JSONObject(Self).Add(FName).AsInt64 := Trunc(ANum)
       else
-        JSONObject(Self).put(FName, ANum);
+        JSONObject(Self).Add(FName).AsFloat := ANum;
     end else begin
       Result := EParse_BadJson;
       Exit;
@@ -5028,11 +5126,11 @@ begin
   end else if StartWith(p, 'False', True) then begin //False
     Inc(p,5);
     {$IFDEF JSON_UNICODE}SkipSpaceW{$ELSE}SkipSpaceA{$ENDIF}(p);
-    JSONObject(Self).put(FName, False);
+    JSONObject(Self).Add(FName).AsBoolean := False;
   end else if StartWith(p, 'True', True) then begin //True
     Inc(p,4);
     {$IFDEF JSON_UNICODE}SkipSpaceW{$ELSE}SkipSpaceA{$ENDIF}(p);
-    JSONObject(Self).put(FName, True);
+    JSONObject(Self).Add(FName).AsBoolean := True;
   end else if StartWith(p, 'NULL', True) then begin //Null
     Inc(p,4);
     {$IFDEF JSON_UNICODE}SkipSpaceW{$ELSE}SkipSpaceA{$ENDIF}(p);
@@ -5228,6 +5326,12 @@ begin
     FreeAndNil(Result);
     if RaiseError then raise;
   end;
+end;
+
+class procedure JSONBase.CatJson(ABuilder: TStringCatHelper;
+  const AValue: JSONString; ADoEscape: Boolean);
+begin
+  CatValue(ABuilder, AValue, ADoEscape);
 end;
 
 class function JSONBase.Parser(const Text: JSONString;
