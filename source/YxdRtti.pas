@@ -1575,7 +1575,35 @@ class procedure TYxdSerialize.ReadValue(AIn: TDataSet; ADest: Pointer;
         end;
 
         AChild := AIn.FindField(AFieldName);
-        if AChild <> nil then begin
+        if AChild = nil then begin
+          case AFieldItem.FieldType.TypeKind of
+            tkInteger, tkFloat, tkInt64:
+              AFieldItem.SetValue(ABaseAddr, 0);
+            {$IFNDEF NEXTGEN}
+            tkString:
+              PShortString(IntPtr(ABaseAddr)+AFieldItem.Offset)^ := '';
+            {$ENDIF !NEXTGEN}
+            tkUString{$IFNDEF NEXTGEN},tkLString,tkWString{$ENDIF !NEXTGEN}:
+              AFieldItem.SetValue(ABaseAddr, '');
+            tkEnumeration:
+              AFieldItem.SetValue(ABaseAddr, 0);
+            tkSet:
+              begin
+                case GetTypeData(AFieldItem.FieldType.Handle).OrdType of
+                  otSByte: PShortint(IntPtr(ABaseAddr)+AFieldItem.Offset)^ := 0;
+                  otUByte: PByte(IntPtr(ABaseAddr)+AFieldItem.Offset)^ := 0;
+                  otSWord: PSmallint(IntPtr(ABaseAddr)+AFieldItem.Offset)^ := 0;
+                  otUWord: PWord(IntPtr(ABaseAddr)+AFieldItem.Offset)^ := 0;
+                  otSLong: PInteger(IntPtr(ABaseAddr)+AFieldItem.Offset)^ := 0;
+                  otULong: PCardinal(IntPtr(ABaseAddr)+AFieldItem.Offset)^ := 0;
+                end;
+              end;
+            tkChar, tkWChar:
+              AFieldItem.SetValue(ABaseAddr, '');
+            tkVariant:
+              PVariant(IntPtr(ABaseAddr)+AFieldItem.Offset)^ := NULL;
+          end;
+        end else begin
           case AFieldItem.FieldType.TypeKind of
             tkInteger:
               begin
@@ -1803,6 +1831,8 @@ class procedure TYxdSerialize.readValue(aIn: JSONBase; aDest: Pointer;
     ABaseAddr: Pointer;
     AChild: PJSONValue;
     J: Integer;
+    AFieldAttrItem: TCustomAttribute;
+    AFieldName: string;
   begin
     AContext := TRttiContext.Create;
     ARttiType := AContext.GetType(AType);
@@ -1813,9 +1843,46 @@ class procedure TYxdSerialize.readValue(aIn: JSONBase; aDest: Pointer;
       if AFieldItem.FieldType <> nil then begin
         if aIn.IsJSONArray then
           AChild := JSONArray(aIn).Items[J]
-        else
-          AChild := JSONObject(aIn).getItem(AFieldItem.Name);
-        if AChild <> nil then begin
+        else begin
+          AFieldName := AFieldItem.Name;
+          if AFieldItem.GetAttributes <> nil then begin
+            for AFieldAttrItem in AFieldItem.GetAttributes do
+              if AFieldAttrItem is FieldNameAttribute then begin
+                AFieldName := FieldNameAttribute(AFieldAttrItem).Name;
+                Break;
+              end;
+          end;
+          AChild := JSONObject(aIn).getItem(AFieldName);
+        end;
+        if AChild = nil then begin
+          case AFieldItem.FieldType.TypeKind of
+            tkInteger, tkFloat, tkInt64:
+              AFieldItem.SetValue(ABaseAddr, 0);
+            {$IFNDEF NEXTGEN}
+            tkString:
+              PShortString(IntPtr(ABaseAddr)+AFieldItem.Offset)^ := '';
+            {$ENDIF !NEXTGEN}
+            tkUString{$IFNDEF NEXTGEN},tkLString,tkWString{$ENDIF !NEXTGEN}:
+              AFieldItem.SetValue(ABaseAddr, '');
+            tkEnumeration:
+              AFieldItem.SetValue(ABaseAddr, 0);
+            tkSet:
+              begin
+                case GetTypeData(AFieldItem.FieldType.Handle).OrdType of
+                  otSByte: PShortint(IntPtr(ABaseAddr)+AFieldItem.Offset)^ := 0;
+                  otUByte: PByte(IntPtr(ABaseAddr)+AFieldItem.Offset)^ := 0;
+                  otSWord: PSmallint(IntPtr(ABaseAddr)+AFieldItem.Offset)^ := 0;
+                  otUWord: PWord(IntPtr(ABaseAddr)+AFieldItem.Offset)^ := 0;
+                  otSLong: PInteger(IntPtr(ABaseAddr)+AFieldItem.Offset)^ := 0;
+                  otULong: PCardinal(IntPtr(ABaseAddr)+AFieldItem.Offset)^ := 0;
+                end;
+              end;
+            tkChar, tkWChar:
+              AFieldItem.SetValue(ABaseAddr, '');
+            tkVariant:
+              PVariant(IntPtr(ABaseAddr)+AFieldItem.Offset)^ := NULL;
+          end;
+        end else begin
           case AFieldItem.FieldType.TypeKind of
             tkInteger:
               AFieldItem.SetValue(ABaseAddr, AChild.AsInteger);
