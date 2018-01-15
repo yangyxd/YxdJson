@@ -1210,7 +1210,7 @@ begin
   SetPointer(Ptr, ASize);
 end;
 
-function TPointerStream.Write(const Buffer; Count: Integer): Longint;
+function TPointerStream.Write(const Buffer; Count: Longint): Longint;
 begin
   raise Exception.Create('PointerStream Ban Written.');
 end;
