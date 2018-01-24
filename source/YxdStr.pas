@@ -416,14 +416,11 @@ function AnsiStrLen(s: PAnsiChar): Integer; {$IFDEF USEINLINE}inline;{$ENDIF}
 begin
   Result := 0;
   if s <> nil then
-    {$IFDEF MACOS}
-    while S^ <> #0 do begin
-    {$ELSE}
-    {$IFDEF POSIX}
+    {$IFDEF NEXTGEN}
     while S^ <> 0 do begin
     {$ELSE}
     while S^ <> #0 do begin
-    {$ENDIF}{$ENDIF}
+    {$ENDIF}
       Inc(Result);
       Inc(s);
     end;
