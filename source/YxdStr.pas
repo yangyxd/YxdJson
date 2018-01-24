@@ -416,11 +416,14 @@ function AnsiStrLen(s: PAnsiChar): Integer; {$IFDEF USEINLINE}inline;{$ENDIF}
 begin
   Result := 0;
   if s <> nil then
+    {$IFDEF MACOS}
+    while S^ <> #0 do begin
+    {$ELSE}
     {$IFDEF POSIX}
     while S^ <> 0 do begin
     {$ELSE}
     while S^ <> #0 do begin
-    {$ENDIF}
+    {$ENDIF}{$ENDIF}
       Inc(Result);
       Inc(s);
     end;
@@ -1238,6 +1241,9 @@ const
 var
   Sp, Rp, P: PCharW;
   Buf: array [0..8] of Byte;
+  {$IFNDEF MSWINDOWS}
+  SpBuf: TBytes;
+  {$ENDIF}
   I, J: Integer;
 begin
   Sp := AStr;
@@ -1247,7 +1253,16 @@ begin
       Rp^ := '+'
     else begin
       if Ord(Sp^) > $FF then begin
+        {$IFDEF MSWINDOWS}
         I := WideCharToMultiByte(CP_ACP, 0, Sp, 1, @Buf[0], 4, nil, nil);
+        {$ELSE}
+        SetLength(SpBuf, 2);
+        Move(Sp^, SpBuf[0], 2);
+        SpBuf := TEncoding.Convert(TEncoding.Unicode, TEncoding.ANSI, SpBuf, 0, 2);
+        I := Length(SpBuf);
+        if I > 0 then
+          Move(SpBuf[0], Buf[0], I);
+        {$ENDIF}
         for J := 0 to I - 1 do begin
           P := HTTP_CONVERT[Buf[J]];
           PInt64(Rp)^ := PInt64(P)^;
@@ -1654,6 +1669,9 @@ var
   {$IFDEF MSWINDOWS}
   len: Integer;
   {$ENDIF}
+  {$IFDEF MACOS}
+  buf: TBytes;
+  {$ENDIF}
 begin
   if l<=0 then begin
     ps:=p;
@@ -1666,10 +1684,16 @@ begin
     SetLength(Result, len);
     WideCharToMultiByte(CP_ACP,0,p,l,PAnsiChar(Result), len, nil, nil);
     {$ELSE}
+    {$IFDEF MACOS}
+    SetLength(buf, l shl 1);
+    Move(p^, buf[0], l shl 1);
+    Result := AnsiString(TEncoding.Convert(TEncoding.Unicode, TEncoding.ANSI, buf, 1, l shl 1));
+    {$ELSE}
     Result.Length:= l shl 1;
     Result.FValue[0]:=0;
     Move(p^,PAnsiChar(Result)^, l shl 1);
     Result := TEncoding.Convert(TEncoding.Unicode, TEncoding.GetEncoding('GB2312'), Result.FValue, 1, l shl 1);
+    {$ENDIF}
     {$ENDIF}
   end else
     Result := '';
@@ -1715,11 +1739,23 @@ end;
 
 {$IFDEF USE_STRENCODEFUNC} {$IFNDEF MSWINDOWS}
 function AnsiDecode(const S: AnsiString): StringW;
+{$IFDEF MACOS}
+var ABytes: TBytes;
+{$ENDIF}
 begin
+  {$IFDEF MACOS}
+  if S <> '' then begin
+    System.SetLength(ABytes, Length(S));
+    Move(PAnsiChar(S)^, PByte(@ABytes[0])^, Length(S));
+    Result := TEncoding.ANSI.GetString(ABytes);
+  end else
+    Result := '';
+  {$ELSE}
   if S.IsUtf8 then
     Result := Utf8Decode(S)
   else
     Result := TEncoding.ANSI.GetString(S.FValue, 1, S.Length);
+  {$ENDIF}
 end;
 {$ENDIF} {$ENDIF}
 
@@ -1877,12 +1913,16 @@ end;
 {$IFDEF USE_STRENCODEFUNC} {$IFNDEF MSWINDOWS}
 function Utf8Decode(const S: AnsiString): StringW; overload;
 begin
+  {$IFDEF MACOS}
+  Result := AnsiDecode(S);
+  {$ELSE}
   if S.IsUtf8 then
     Result := Utf8Decode(PAnsiChar(S), S.Length)
   else if {$IFDEF NEXTGEN}S.Length{$ELSE}Length(S){$ENDIF} > 0 then
     Result := AnsiDecode(S)
   else
     Result := '';
+  {$ENDIF}
 end;
 {$ENDIF} {$ENDIF}
 
