@@ -7195,7 +7195,7 @@ var
 begin
   Result := NewJsonArray();
   Result.FParent := Self;
-  Item := NewJsonValue();
+  Item := YxdJson.NewJsonValue();
   Item.FName := '';
   Item.FNameHash := 0;
   Item.FObject := Result;
@@ -7213,7 +7213,7 @@ var
 begin
   Result := NewJsonObject();
   Result.FParent := Self;
-  Item := NewJsonValue();
+  Item := YxdJson.NewJsonValue();
   Item.FName := '';
   Item.FNameHash := 0;
   Item.FObject := Result;
@@ -7421,7 +7421,7 @@ end;
 
 function JSONArray.NewJsonValue(): PJSONValue;
 begin
-  Result := NewJsonValue();
+  Result := YxdJson.NewJsonValue();
   Result.FObject := nil;
   Result.FName := '';
   Result.FNameHash := 0;
