@@ -13,7 +13,6 @@ type
     Panel1: TPanel;
     CheckBox1: TCheckBox;
     CheckBox2: TCheckBox;
-    Label1: TLabel;
     Button1: TButton;
     CheckBox3: TCheckBox;
     Label2: TLabel;
@@ -24,6 +23,8 @@ type
     CheckBox5: TCheckBox;
     Memo1: TSynMemo;
     Memo2: TSynMemo;
+    chkR: TCheckBox;
+    chkW: TCheckBox;
     procedure CheckBox1Click(Sender: TObject);
     procedure CheckBox2Click(Sender: TObject);
     procedure Button1Click(Sender: TObject);
@@ -58,20 +59,43 @@ begin
     M := 4;
   B := CheckBox4.Checked;
   V := Memo1.Text;
-  S := ''; 
-  T := GetTickCount;
+  S := '';    
   try
     Json := nil;
+    T := 0;
     try
-      for I := 0 to J - 1 do begin
-        Json := JSONBase.Parser(V);
+      if chkR.Checked and chkW.Checked then begin
+      
+        T := GetTickCount;
+        for I := 0 to J - 1 do begin
+          Json := JSONBase.Parser(V);
+          S := Json.ToString(M, B);
+          FreeAndNil(Json);
+        end;
+        T := GetTickCount - T;
+
+      end else if chkR.Checked then begin
+
+        T := GetTickCount;
+        for I := 0 to J - 1 do begin
+          FreeAndNil(Json);
+          Json := JSONBase.Parser(V);
+        end;
+        T := GetTickCount - T;
         S := Json.ToString(M, B);
-        FreeAndNil(Json);
+
+      end else begin
+
+        Json := JSONBase.Parser(V);
+        T := GetTickCount;
+        for I := 0 to J - 1 do
+          S := Json.ToString(M, B);
+        T := GetTickCount - T;
+
       end;
     finally
       FreeAndNil(Json);
-      T := GetTickCount - T;
-      Label1.Caption := Format('用时: %dms', [T]);
+      StatusBar1.Panels.Items[1].Text := Format('用时: %dms', [T]);
       Memo2.Lines.Text := S;
     end;
   except
@@ -100,6 +124,7 @@ end;
 procedure TForm1.FormCreate(Sender: TObject);
 begin
   DragAcceptFiles(Handle, True);
+  JsonNameAfterSpace := True;
 end;
 
 procedure TForm1.Timer1Timer(Sender: TObject);
@@ -130,7 +155,7 @@ begin
     S := string(FileNameA);
     V := TFileStream.Create(S, 0);
     try
-      S := LoadTextA(V);
+      S := YxdStr.LoadTextA(V);
       Memo1.Lines.Text := S;
     finally
       V.Free;

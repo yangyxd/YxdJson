@@ -151,6 +151,7 @@ interface
 {$DEFINE USERTTI}      // 是否使用RTTI功能
 {$DEFINE USERegEx}     // 是否使用正则表达式搜索功能，D2010之前版本需要引用相关单元
 {$DEFINE USEBase64}    // 是否使用Base64单元
+{.$DEFINE USEPool}      // 是否使用池 (服务端使用建议开启)
 
 {$IFDEF USERTTI}
   {$DEFINE USEDBRTTI}    // 是否使用DataSet序列化功能，必须先启用USERTTI
@@ -198,7 +199,7 @@ uses
   {$IFDEF JSON_UNICODE}Soap.EncdDecd, {$ELSE}{$IFDEF USEBase64}Base64, {$ENDIF}{$ENDIF}
   {$IF CompilerVersion > 27}System.NetEncoding, {$IFEND}
   {$ENDIF}
-  SysUtils, Classes, Variants, Math, DateUtils;
+  SysUtils, Classes, Variants, Math, DateUtils, SyncObjs;
 
 type
   {$IFDEF JSON_UNICODE}
@@ -289,10 +290,13 @@ type
     procedure SetPosition(const Value: Integer);
     procedure NeedSize(ASize:Integer);
     function GetLast: PJSONChar;
+    function GetEndChar: PChar;
+    procedure SetDest(const Value: PJSONChar);
   public
     constructor Create; overload;
     constructor Create(ASize: Integer); overload;
     destructor Destroy; override;
+    procedure IncSize(const V: Integer);
     function Cat(p: PJSONChar; len: Integer): TStringCatHelper; overload;
     function Cat(const s: JSONString): TStringCatHelper; overload;
     function Cat(c: JSONChar): TStringCatHelper; overload;
@@ -303,13 +307,15 @@ type
     function Cat(const V:TGuid): TStringCatHelper;overload;
     function Cat(const V:Variant): TStringCatHelper;overload;
     function Space(count:Integer): TStringCatHelper;
+    function Replicate(const V: string; Count: Integer = 1): TStringCatHelper;
     function Back(ALen: Integer): TStringCatHelper;
     function BackIf(const s: PJSONChar): TStringCatHelper;
     property Value: JSONString read GetValue;
     property Chars[Index: Integer]: JSONChar read GetChars;
     property Start: PJSONChar read FStart;
     property Last: PJSONChar read GetLast;
-    property Current: PJSONChar read FDest;
+    property Current: PJSONChar read FDest write SetDest;
+    property EndChar: PChar read GetEndChar;
     property Position: Integer read GetPosition write SetPosition;
   end;
 {$ENDIF}
@@ -1041,7 +1047,7 @@ function StartWith(s, startby: PJSONChar; AIgnoreCase: Boolean): Boolean;
 //保存文本
 {$IFNDEF USEYxdStr}
 procedure SaveTextA(AStream: TStream; const S: JSONStringA);
-procedure SaveTextU(AStream: TStream; const S: JSONStringA; AWriteBom: Boolean = True);
+procedure SaveTextU(AStream: TStream; const S: JSONStringA; AWriteBom: Boolean = True; IsUtf8: Boolean = False);
 procedure SaveTextW(AStream: TStream; const S: JSONStringW; AWriteBom: Boolean = True);
 procedure SaveTextWBE(AStream: TStream; const S: JSONStringW; AWriteBom: Boolean = True);
 {$ENDIF}
@@ -1225,6 +1231,219 @@ begin
   raise Exception.Create('PointerStream Ban Written.');
 end;
 
+{$IFDEF USEPool}
+type
+  MAddrList = array of Pointer;
+  PMAddrList = ^MAddrList;
+type
+  TMemPoolNotify = procedure(Sender: TObject; const AData: Pointer) of object;
+  TMemPoolNew = procedure(Sender: TObject; var AData: Pointer) of object;
+type
+  TSyncMemPool = class(TObject)
+  private
+    FPool: MAddrList;
+    FCount: Integer;
+    FMaxSize: Integer;
+    FBlockSize: Cardinal;
+    FLocker: TCriticalSection;
+  protected
+    procedure DoFree(const AData: Pointer); virtual;
+    procedure DoNew(var AData: Pointer); virtual;
+  public
+    constructor Create(BlockSize: Cardinal; MaxSize: Integer = 64);
+    destructor Destroy; override;
+    procedure Clear;
+    procedure Lock; {$IFDEF USEINLINE}inline;{$ENDIF}
+    procedure Unlock; {$IFDEF USEINLINE}inline;{$ENDIF}
+    function Pop(): Pointer;
+    procedure Push(const V: Pointer);
+    property BlockSize: Cardinal read FBlockSize;
+    property MaxSize: Integer read FMaxSize;
+    property Count: Integer read FCount;
+  end;
+
+  TJsonClass = type of JSONBase;
+
+  TSyncObjectPool = class(TSyncMemPool)
+  private
+    FClass: TJsonClass;
+  protected
+    procedure DoFree(const AData: Pointer); override;
+    procedure DoNew(var AData: Pointer); override; 
+  end;
+  
+function ClacBlockSize(const V: Cardinal): Cardinal;
+begin
+  Result := V;
+  if Result > 64 then begin
+    // 块大小以64字节对齐，这样的执行效率最高
+    if Result mod 64 > 0 then
+      Result := (Result div 64 + 1) * 64;
+  end;
+end;
+
+procedure TSyncMemPool.Clear;
+var
+  I: Integer;
+begin
+  FLocker.Enter;
+  try
+    I := 0;
+    while I < FCount do begin
+      DoFree(FPool[I]);
+      Inc(I);
+    end;
+  finally
+    FLocker.Leave;
+  end;
+end;
+
+constructor TSyncMemPool.Create(BlockSize: Cardinal; MaxSize: Integer);
+begin
+  FLocker := TCriticalSection.Create;
+  FCount := 0;
+  if MaxSize < 4 then
+    FMaxSize := 4
+  else
+    FMaxSize := MaxSize;
+  SetLength(FPool, FMaxSize);
+  FBlockSize := ClacBlockSize(BlockSize);
+end;
+
+destructor TSyncMemPool.Destroy;
+begin
+  try
+    Clear;
+  finally
+    FreeAndNil(FLocker);  
+    inherited;
+  end;
+end;
+
+procedure TSyncMemPool.DoFree(const AData: Pointer);
+begin
+  FreeMem(AData);
+end;
+
+procedure TSyncMemPool.DoNew(var AData: Pointer);
+begin
+  GetMem(AData, FBlockSize);
+end;
+
+procedure TSyncMemPool.Lock;
+begin
+  FLocker.Enter;
+end;
+
+function TSyncMemPool.Pop: Pointer;
+begin
+  FLocker.Enter;
+  if FCount > 0 then begin
+    Dec(FCount);
+    Result := FPool[FCount];
+    FLocker.Leave;
+    Exit;
+  end;
+  FLocker.Leave;
+  DoNew(Result);
+end;
+
+procedure TSyncMemPool.Push(const V: Pointer);
+begin
+  if V = nil then Exit;  
+  FLocker.Enter;
+  if FCount < FMaxSize then begin
+    FPool[FCount] := V;
+    Inc(FCount);
+    FLocker.Leave;
+    Exit;
+  end;
+  FLocker.Leave;
+  DoFree(V);
+end;
+
+procedure TSyncMemPool.Unlock;
+begin
+  FLocker.Leave;
+end;
+
+{ TSyncObjectPool }
+
+procedure TSyncObjectPool.DoFree(const AData: Pointer);
+begin
+  TObject(AData).Free;
+end;
+
+procedure TSyncObjectPool.DoNew(var AData: Pointer);
+begin
+  AData := FClass.Create;
+end;
+
+var
+  Pool_JsonValue: TSyncMemPool;
+  Pool_JsonObject: TSyncObjectPool;
+  Pool_JsonArray: TSyncObjectPool;
+{$ENDIF}
+
+function NewJsonValue(): PJSONValue; {$IFNDEF USEPool}{$IFDEF USEINLINE}inline;{$ENDIF}{$ENDIF}
+begin
+  {$IFDEF USEPool}
+  Result := Pool_JsonValue.Pop;
+  FillChar(Result^, Pool_JsonValue.FBlockSize, 0);
+  {$ELSE}
+  New(Result);
+  {$ENDIF}
+end;
+
+procedure FreeJsonValue(var P: PJSONValue); {$IFNDEF USEPool}{$IFDEF USEINLINE}inline;{$ENDIF}{$ENDIF}
+begin
+  {$IFDEF USEPool}
+  P.FName := '';
+  SetLength(P.FValue, 0);
+  Pool_JsonValue.Push(P);
+  {$ELSE}
+  Dispose(P);
+  {$ENDIF}
+end;
+
+function NewJsonObject: JSONObject; {$IFNDEF USEPool}{$IFDEF USEINLINE}inline;{$ENDIF}{$ENDIF}
+begin
+  {$IFDEF USEPool}
+  Result := JSONObject(Pool_JsonObject.Pop);
+  {$ELSE}
+  Result := JSONObject.Create;
+  {$ENDIF}
+end;
+
+procedure FreeJsonObject(var V: JSONBase); {$IFNDEF USEPool}{$IFDEF USEINLINE}inline;{$ENDIF}{$ENDIF}
+begin
+  {$IFDEF USEPool}
+  V.Clear;
+  Pool_JsonObject.Push(Pointer(V));
+  {$ELSE}
+  FreeAndNil(V);
+  {$ENDIF}
+end;
+
+function NewJsonArray: JSONArray; {$IFNDEF USEPool}{$IFDEF USEINLINE}inline;{$ENDIF}{$ENDIF}
+begin
+  {$IFDEF USEPool}
+  Result := JSONArray(Pool_JsonArray.Pop);
+  {$ELSE}
+  Result := JSONArray.Create;
+  {$ENDIF}
+end;
+
+procedure FreeJsonArray(var V: JSONBase); {$IFNDEF USEPool}{$IFDEF USEINLINE}inline;{$ENDIF}{$ENDIF}
+begin
+  {$IFDEF USEPool}
+  V.Clear;
+  Pool_JsonArray.Push(Pointer(V));
+  {$ELSE}
+  FreeAndNil(V);
+  {$ENDIF}
+end;
+
 {$IFNDEF USEBase64}
 {$IFNDEF JSON_UNICODE}
 type
@@ -1238,7 +1457,7 @@ const
     10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25,
     0, 0, 0, 0, 0, 0, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35,
     36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51
-  );   
+  );
 type
   Base64Proc = function(const Source; SourceSize: Integer; var Buf): Integer;
 
@@ -1404,6 +1623,12 @@ begin
   Base64Decode(Base64Source, SourceSize, Result[1]);
 end;  
 {$ENDIF}
+{$ENDIF}
+
+{$IFNDEF USEYxdStr}
+const
+  LowerHexChars: array [0 .. 15] of Char = ('0', '1', '2', '3', '4', '5', '6',
+    '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f');
 {$ENDIF}
 
 {$IFNDEF USEYxdStr}
@@ -2696,7 +2921,7 @@ end;
 {$IFNDEF USEYxdStr}
 function Utf8Encode(const p: JSONStringW): AnsiString;
 begin
-  Result:=Utf8Encode(PWideChar(p), Length(p));
+  Result := Utf8Encode(PWideChar(p), Length(p));
 end;
 
 function Utf8Encode(p:PWideChar; l:Integer): AnsiString;
@@ -2949,7 +3174,7 @@ begin
 end;
 
 {$IFNDEF USEYxdStr}
-procedure SaveTextU(AStream: TStream; const S: AnsiString; AWriteBom: Boolean);
+procedure SaveTextU(AStream: TStream; const S: AnsiString; AWriteBom: Boolean; IsUtf8: Boolean);
 
   procedure WriteBom;
   var
@@ -2973,7 +3198,10 @@ procedure SaveTextU(AStream: TStream; const S: AnsiString; AWriteBom: Boolean);
 begin
   if AWriteBom then
     WriteBom;
-  SaveAnsi;
+  if IsUtf8 then
+    AStream.WriteBuffer(PAnsiChar(S)^, Length(S))
+  else
+    SaveAnsi;
 end;
 {$ENDIF}
 
@@ -3657,8 +3885,16 @@ end;
 
 procedure JSONValue.Free;
 begin
-  if (FType = jdtObject) and (FObject <> nil) then
+  if (FType = jdtObject) and (FObject <> nil) then begin
+    {$IFNDEF UsePool}
     FObject.Free;
+    {$ELSE}
+    if FObject.IsJSONArray then
+      FreeJsonArray(FObject)
+    else
+      FreeJsonObject(FObject);
+    {$ENDIF}
+  end;
 end;
 
 function _StrToBoolDef(const Value: string): Boolean;
@@ -4035,12 +4271,12 @@ procedure JSONValue.SetAsVariant(const Value: Variant);
     if Length(FValue) <> 0 then SetLength(FValue, 0);
     if (Assigned(FObject)) and (not FObject.GetIsArray) then begin
       P := FObject.FParent;
-      FreeAndNil(FObject);
+      FreeJsonObject(FObject);
     end else
       P := nil;
     if not Assigned(FObject) then begin
-      FObject := JSONArray.Create;  
-      FObject.FParent := P; 
+      FObject := NewJsonArray();
+      FObject.FParent := P;
     end else
       FObject.Clear;
     FType := jdtObject;
@@ -4446,7 +4682,7 @@ begin
       Item := FItems.Items[i];
       if (Item <> nil) then begin
         Item.Free;
-        Dispose(Item);
+        FreeJsonValue(Item);
       end;
     end;
     FItems.Clear;
@@ -4491,9 +4727,9 @@ function JSONBase.CopyIf(const ATag: Pointer; AFilter: JSONFilterEventA): JSONBa
 begin
   if Assigned(AFilter) then begin
     if GetIsArray then
-      Result := JSONArray.Create
+      Result := NewJsonArray()
     else
-      Result := JSONObject.Create;
+      Result := NewJsonObject();
     NestCopy(Self, Result);
   end else
     Result := Copy;
@@ -4529,9 +4765,9 @@ function JSONBase.CopyIf(const ATag: Pointer; AFilter: JSONFilterEvent): JSONBas
 begin
   if Assigned(AFilter) then begin
     if GetIsArray then
-      Result := JSONArray.Create
+      Result := NewJsonArray()
     else
-      Result := JSONObject.Create;
+      Result := NewJsonObject();
     NestCopy(Self, Result);
   end else
     Result := Copy;
@@ -4577,7 +4813,7 @@ var
   ps: PJSONChar;
   ErrCode: Integer;
 begin
-  ABuilder := TStringCatHelper.Create;
+  ABuilder := TStringCatHelper.Create(8192);
   ps := p;
   try
     try
@@ -4657,7 +4893,7 @@ begin
   Clear;
   FItems.Free;
   if (FParent = nil) and (FValue <> nil) and (FValue.FType = jdtUnknown) then
-    Dispose(FValue); // JSON为顶点对象时，FValue不为nil时释放FValue
+    FreeJsonValue(FValue); // JSON为顶点对象时，FValue不为nil时释放FValue
   inherited;
 end;
 
@@ -5084,9 +5320,9 @@ function JSONBase.NewChildArray(const key: JSONString): JSONArray;
 var
   Item: PJSONValue;
 begin
-  Result := JSONArray.Create;
+  Result := NewJsonArray();
   Result.FParent := Self;
-  New(Item);
+  Item := NewJsonValue();
   Item.FName := key;
   Item.FNameHash := 0;
   Item.FObject := Result;
@@ -5099,9 +5335,9 @@ function JSONBase.NewChildObject(const key: JSONString): JSONObject;
 var
   Item: PJSONValue;
 begin
-  Result := JSONObject.Create;
+  Result := NewJsonObject();
   Result.FParent := Self;
-  New(Item);
+  Item := NewJsonValue();
   Item.FName := key;
   Item.FNameHash := 0;
   Item.FObject := Result;
@@ -5313,22 +5549,22 @@ end;
 
 class function JSONBase.parseArray(const text: JSONString; RaiseError: Boolean): JSONArray;
 begin
-  Result := JSONArray.Create;
+  Result := NewJsonArray();
   try
     JSONArray(Result).parse(text);
   except
-    FreeAndNil(Result);
+    FreeJsonArray(JSONBase(Result));
     if RaiseError then raise;
   end;
 end;
 
 class function JSONBase.parseObject(const text: JSONString; RaiseError: Boolean): JSONObject;
 begin
-  Result := JSONObject.Create;
+  Result := NewJsonObject();
   try
     JSONObject(Result).parse(text);
   except
-    FreeAndNil(Result);
+    FreeJsonObject(JSONBase(Result));
     if RaiseError then raise;
   end;
 end;  
@@ -5351,9 +5587,9 @@ begin
     Exit;
   end;
   if P^ = '[' then
-    Result := JSONArray.Create
+    Result := NewJsonArray()
   else
-    Result := JSONObject.Create;
+    Result := NewJsonObject();
   try
     Result.Parse(P1, Len);
   except
@@ -5376,9 +5612,9 @@ begin
   P := PJSONChar(Text);
   {$IFDEF JSON_UNICODE}SkipSpaceW(P);{$ELSE}SkipSpaceA(P);{$ENDIF}
   if P^ = '[' then
-    Result := JSONArray.Create
+    Result := NewJsonArray()
   else
-    Result := JSONObject.Create;
+    Result := NewJsonObject();
   try
     Result.Parse(P);
   except
@@ -5469,7 +5705,7 @@ begin
   Result := nil;
   while p^ <> #0 do begin
     if (Result <> nil) and (Result.FObject = nil) then begin
-      Result.AsJsonObject := JSONObject.Create;
+      Result.AsJsonObject := NewJsonObject();
       Result.FObject.FParent := AParent;
       AParent := Result.FObject;
       AParent.FValue := Result;
@@ -5581,7 +5817,7 @@ begin
   if AType = jdtUnknown then begin
     AddUnknown();
   end else begin
-    New(Item);
+    Item := NewJsonValue();
     Item.FObject := nil;
     Item.FNameHash := 0;
     Item.FName := key;
@@ -5681,7 +5917,7 @@ begin
     item := FItems.Items[index];
     if item <> nil then begin
       item.Free;
-      Dispose(Item);
+      FreeJsonValue(Item);
       FItems.Delete(Index);
     end;
   end;
@@ -5698,7 +5934,7 @@ begin
       obj.FParent := nil;
       obj.FValue := nil;
       FItems.Delete(i);
-      Dispose(Item);
+      FreeJsonValue(Item);
     end;
   end;
 end;
@@ -5817,7 +6053,7 @@ end;
 procedure JSONBase.SetName(const Value: JSONString);
 begin
   if FValue = nil then begin
-    New(FValue);
+    FValue := NewJsonValue();
     FValue.FObject := nil;
     FValue.FNameHash := 0;
     FValue.FType := jdtUnknown;
@@ -6076,6 +6312,11 @@ begin
   Result := FStart[AIndex];
 end;
 
+function TStringCatHelper.GetEndChar: PChar;
+begin
+  Result := FStart + FSize;
+end;
+
 function TStringCatHelper.GetPosition: Integer;
 begin
   Result := FDest - PJSONChar(FValue);
@@ -6088,6 +6329,11 @@ begin
   L := FDest - PJSONChar(FValue);
   SetLength(Result, L);
   Move(FStart^, PJSONChar(Result)^, L{$IFDEF JSON_UNICODE} shl 1{$ENDIF});
+end;
+
+procedure TStringCatHelper.IncSize(const V: Integer);
+begin
+  NeedSize(-V);
 end;
 
 function TStringCatHelper.GetLast: PJSONChar;
@@ -6113,6 +6359,25 @@ begin
   end;
 end;
 
+function TStringCatHelper.Replicate(const V: string;
+  Count: Integer): TStringCatHelper;
+var
+  ps: PChar;
+  l: Integer;
+begin
+  Result := Self;
+  if count > 0 then begin
+    ps := PChar(V);
+    l := Length(V);
+    NeedSize(-(l * Count));
+    while count > 0 do begin
+      Move(ps^, FDest^, l{$IFDEF UNICODE} shl 1{$ENDIF});
+      Inc(FDest, l);
+      Dec(count);
+    end;
+  end;
+end;
+
 function TStringCatHelper.Space(count: Integer): TStringCatHelper;
 begin
 {$IFDEF JSON_UNICODE}
@@ -6132,6 +6397,16 @@ begin
     end;
   end;
 {$ENDIF}
+end;
+
+procedure TStringCatHelper.SetDest(const Value: PJSONChar);
+begin
+  if Value < FStart then
+    FDest := FStart
+  else if (Value - FStart) > FSize then
+    FDest := FStart + FSize
+  else
+    FDest := Value;
 end;
 
 procedure TStringCatHelper.SetPosition(const Value: Integer);
@@ -6197,7 +6472,7 @@ begin
   if value.FParent <> nil then
     value.FParent.RemoveObject(value)
   else if (value.FValue <> nil) and (value.FValue.FType = jdtUnknown) then
-    Dispose(Value.FValue);
+    FreeJsonValue(Value.FValue);
   value.FParent := Self;
   value.FValue := item;
 end;
@@ -6212,7 +6487,7 @@ end;
 
 function JSONObject.Add(const Key: JSONString): PJSONValue;
 begin
-  New(Result);
+  Result := NewJsonValue();
   Result.FObject := nil;
   Result.FNameHash := 0;
   Result.FName := Key;
@@ -6297,7 +6572,7 @@ end;
 
 function JSONObject.Clone: JSONObject;
 begin
-  Result := JSONObject.Create;
+  Result := NewJsonObject();
   Result.Assign(Self);
 end;
 
@@ -6545,7 +6820,7 @@ begin
     Result := nil;
     Exit;
   end;
-  Result := JSONObject.Create;
+  Result := NewJsonObject();
   TYxdSerialize.writeValue(Result, '', aIn{$IFNDEF JSON_UNICODE}, TYxdSerialize.GetObjectTypeInfo(aIn){$ENDIF});
 end;
 {$ENDIF}
@@ -6638,9 +6913,9 @@ begin
           if j <> 0 then Exit;
           i := p1 - p + 2;
           ABuilder.Position := 0;
-          Result := JSONObject.Create;
+          Result := NewJsonObject();
           if DecodeCopy(Result, i) <> 0 then
-            FreeAndNil(Result);
+            FreeJsonObject(JSONBase(Result));
           Break;
         end else
           ABuilder.Position := 0;
@@ -6662,7 +6937,7 @@ begin
   json := parseObjectByName(text, key, NULL);
   if Assigned(json) then begin
     Result := json.getString(key);
-    FreeAndNil(json);
+    FreeJsonObject(JSONBase(json));
   end else
     Result := '';
 end;
@@ -6676,7 +6951,7 @@ begin
   if value.FParent <> nil then
     value.FParent.RemoveObject(value)
   else if (value.FValue <> nil) and (value.FValue.FType = jdtUnknown) then
-    Dispose(Value.FValue);
+    FreeJsonValue(Value.FValue);
   value.FParent := Self;
   value.FValue := item;
 end;
@@ -6825,7 +7100,7 @@ begin
   if value.FParent <> nil then
     value.FParent.RemoveObject(value)
   else if (value.FValue <> nil) and (value.FValue.FType = jdtUnknown) then
-    Dispose(Value.FValue);
+    FreeJsonValue(Value.FValue);
   value.FParent := Self;
   value.FValue := item;
 end;
@@ -6879,7 +7154,7 @@ begin
   if value.FParent <> nil then
     value.FParent.RemoveObject(value)
   else if (value.FValue <> nil) and (value.FValue.FType = jdtUnknown) then
-    Dispose(Value.FValue);
+    FreeJsonValue(Value.FValue);
   value.FParent := Self;
   value.FValue := item;
 end;
@@ -6918,9 +7193,9 @@ function JSONArray.AddChildArray(const Index: Integer): JSONArray;
 var
   Item: PJSONValue;
 begin
-  Result := JSONArray.Create;
+  Result := NewJsonArray();
   Result.FParent := Self;
-  New(Item);
+  Item := NewJsonValue();
   Item.FName := '';
   Item.FNameHash := 0;
   Item.FObject := Result;
@@ -6936,9 +7211,9 @@ function JSONArray.AddChildObject(const Index: Integer): JSONObject;
 var
   Item: PJSONValue;
 begin
-  Result := JSONObject.Create;
+  Result := NewJsonObject();
   Result.FParent := Self;
-  New(Item);
+  Item := NewJsonValue();
   Item.FName := '';
   Item.FNameHash := 0;
   Item.FObject := Result;
@@ -6972,7 +7247,7 @@ end;
 
 function JSONArray.Clone: JSONArray;
 begin
-  Result := JSONArray.Create;
+  Result := NewJsonArray();
   Result.Assign(Self);
 end;
 
@@ -7146,7 +7421,7 @@ end;
 
 function JSONArray.NewJsonValue(): PJSONValue;
 begin
-  New(Result);
+  Result := NewJsonValue();
   Result.FObject := nil;
   Result.FName := '';
   Result.FNameHash := 0;
@@ -7563,7 +7838,19 @@ initialization
   CSPBlobs2 := CSPBlobs + 4;
   CSPBlobs3 := CSPBlobs2 + 2;
 {$ENDIF}
+{$IFDEF USEPool}
+  Pool_JsonValue := TSyncMemPool.Create(Max(SizeOf(JSONValue), 32), 40960);
+  Pool_JsonObject := TSyncObjectPool.Create(SizeOf(JSONObject), 40960);
+  Pool_JsonObject.FClass := JSONObject;
+  Pool_JsonArray := TSyncObjectPool.Create(SizeOf(JSONArray), 40960);
+  Pool_JsonArray.FClass := JSONArray;
+{$ENDIF}
 
 finalization
+{$IFDEF USEPool}
+  FreeAndNil(Pool_JsonValue);
+  FreeAndNil(Pool_JsonObject);
+  FreeAndNil(Pool_JsonArray);
+{$ENDIF}
 
 end.

@@ -30,12 +30,6 @@ object Form1: TForm1
     Align = alTop
     BevelOuter = bvNone
     TabOrder = 0
-    object Label1: TLabel
-      Left = 774
-      Top = 14
-      Width = 3
-      Height = 13
-    end
     object Label2: TLabel
       Left = 446
       Top = 15
@@ -100,8 +94,30 @@ object Form1: TForm1
       Width = 106
       Height = 17
       Caption = 'Name'#21518#21152#31354#26684
+      Checked = True
+      State = cbChecked
       TabOrder = 6
       OnClick = CheckBox5Click
+    end
+    object chkR: TCheckBox
+      Left = 752
+      Top = 13
+      Width = 81
+      Height = 17
+      Caption = #35299#26512#27979#35797
+      Checked = True
+      State = cbChecked
+      TabOrder = 7
+    end
+    object chkW: TCheckBox
+      Left = 832
+      Top = 13
+      Width = 81
+      Height = 17
+      Caption = #32534#30721#27979#35797
+      Checked = True
+      State = cbChecked
+      TabOrder = 8
     end
   end
   object StatusBar1: TStatusBar
@@ -112,6 +128,9 @@ object Form1: TForm1
     Panels = <
       item
         Width = 500
+      end
+      item
+        Width = 300
       end>
   end
   object Memo1: TSynMemo
