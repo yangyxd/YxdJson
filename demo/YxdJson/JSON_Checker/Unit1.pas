@@ -5,13 +5,11 @@ interface
 uses
   YxdJson, YxdStr, ShellAPI,
   Windows, Messages, SysUtils, Variants, Classes, Graphics, Controls, Forms,
-  Dialogs, ExtCtrls, StdCtrls, ComCtrls;
+  Dialogs, ExtCtrls, StdCtrls, ComCtrls, SynEdit, SynMemo;
 
 type
   TForm1 = class(TForm)
-    Memo1: TMemo;
     Splitter1: TSplitter;
-    Memo2: TMemo;
     Panel1: TPanel;
     CheckBox1: TCheckBox;
     CheckBox2: TCheckBox;
@@ -23,11 +21,15 @@ type
     CheckBox4: TCheckBox;
     StatusBar1: TStatusBar;
     Timer1: TTimer;
+    CheckBox5: TCheckBox;
+    Memo1: TSynMemo;
+    Memo2: TSynMemo;
     procedure CheckBox1Click(Sender: TObject);
     procedure CheckBox2Click(Sender: TObject);
     procedure Button1Click(Sender: TObject);
     procedure FormCreate(Sender: TObject);
     procedure Timer1Timer(Sender: TObject);
+    procedure CheckBox5Click(Sender: TObject);
   private
     { Private declarations }
     procedure WMDropFiles(var Msg: TWMDropFiles); message WM_DROPFILES;
@@ -90,6 +92,11 @@ begin
     YxdJson.JsonDateFormatStyle := jdsNormal;
 end;
 
+procedure TForm1.CheckBox5Click(Sender: TObject);
+begin
+  JsonNameAfterSpace := CheckBox5.Checked;
+end;
+
 procedure TForm1.FormCreate(Sender: TObject);
 begin
   DragAcceptFiles(Handle, True);
@@ -97,7 +104,7 @@ end;
 
 procedure TForm1.Timer1Timer(Sender: TObject);
 var
-  O: TMemo;
+  O: TSynMemo;
 begin
   if Memo1.Focused then
     O := Memo1
@@ -105,7 +112,7 @@ begin
     O := Memo2
   else
     Exit;
-  StatusBar1.Panels.Items[0].Text := Format('选择开始:%d 当前选择：%d', [O.SelStart, O.SelLength]);
+  StatusBar1.Panels.Items[0].Text := Format('列: %d 当前选择：%d', [O.CaretX, O.SelLength]);
 end;
 
 procedure TForm1.WMDropFiles(var Msg: TWMDropFiles);

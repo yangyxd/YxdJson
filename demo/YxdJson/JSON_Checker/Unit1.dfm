@@ -22,43 +22,6 @@ object Form1: TForm1
     ExplicitTop = 0
     ExplicitHeight = 690
   end
-  object Memo1: TMemo
-    Left = 0
-    Top = 41
-    Width = 553
-    Height = 522
-    Align = alLeft
-    BorderStyle = bsNone
-    Font.Charset = DEFAULT_CHARSET
-    Font.Color = clWindowText
-    Font.Height = -12
-    Font.Name = #24494#36719#38597#40657
-    Font.Style = []
-    HideSelection = False
-    ParentFont = False
-    ScrollBars = ssVertical
-    TabOrder = 0
-    ExplicitHeight = 649
-  end
-  object Memo2: TMemo
-    Left = 557
-    Top = 41
-    Width = 465
-    Height = 522
-    Align = alClient
-    BorderStyle = bsNone
-    Font.Charset = DEFAULT_CHARSET
-    Font.Color = clWindowText
-    Font.Height = -12
-    Font.Name = #24494#36719#38597#40657
-    Font.Style = []
-    HideSelection = False
-    ParentFont = False
-    ScrollBars = ssVertical
-    TabOrder = 1
-    ExplicitWidth = 559
-    ExplicitHeight = 649
-  end
   object Panel1: TPanel
     Left = 0
     Top = 0
@@ -66,18 +29,15 @@ object Form1: TForm1
     Height = 41
     Align = alTop
     BevelOuter = bvNone
-    TabOrder = 2
-    ExplicitLeft = 424
-    ExplicitTop = 256
-    ExplicitWidth = 185
+    TabOrder = 0
     object Label1: TLabel
-      Left = 694
+      Left = 774
       Top = 14
-      Width = 49
+      Width = 3
       Height = 13
     end
     object Label2: TLabel
-      Left = 366
+      Left = 446
       Top = 15
       Width = 60
       Height = 13
@@ -93,7 +53,7 @@ object Form1: TForm1
       OnClick = CheckBox1Click
     end
     object CheckBox2: TCheckBox
-      Left = 99
+      Left = 94
       Top = 13
       Width = 97
       Height = 17
@@ -102,7 +62,7 @@ object Form1: TForm1
       OnClick = CheckBox2Click
     end
     object Button1: TButton
-      Left = 515
+      Left = 595
       Top = 10
       Width = 129
       Height = 25
@@ -111,7 +71,7 @@ object Form1: TForm1
       OnClick = Button1Click
     end
     object CheckBox3: TCheckBox
-      Left = 188
+      Left = 175
       Top = 13
       Width = 74
       Height = 17
@@ -119,7 +79,7 @@ object Form1: TForm1
       TabOrder = 3
     end
     object Edit1: TEdit
-      Left = 432
+      Left = 512
       Top = 12
       Width = 63
       Height = 21
@@ -127,12 +87,21 @@ object Form1: TForm1
       Text = '1'
     end
     object CheckBox4: TCheckBox
-      Left = 252
+      Left = 231
       Top = 13
       Width = 85
       Height = 17
       Caption = 'Unicode'#36716#30721
       TabOrder = 5
+    end
+    object CheckBox5: TCheckBox
+      Left = 319
+      Top = 13
+      Width = 106
+      Height = 17
+      Caption = 'Name'#21518#21152#31354#26684
+      TabOrder = 6
+      OnClick = CheckBox5Click
     end
   end
   object StatusBar1: TStatusBar
@@ -144,9 +113,64 @@ object Form1: TForm1
       item
         Width = 500
       end>
-    ExplicitLeft = 568
-    ExplicitTop = 304
-    ExplicitWidth = 0
+  end
+  object Memo1: TSynMemo
+    Left = 0
+    Top = 41
+    Width = 553
+    Height = 522
+    Align = alLeft
+    Ctl3D = True
+    ParentCtl3D = False
+    Font.Charset = DEFAULT_CHARSET
+    Font.Color = clWindowText
+    Font.Height = -13
+    Font.Name = 'Courier New'
+    Font.Style = []
+    TabOrder = 2
+    Gutter.AutoSize = True
+    Gutter.Color = 15400872
+    Gutter.BorderColor = 14548848
+    Gutter.Font.Charset = DEFAULT_CHARSET
+    Gutter.Font.Color = clWindowText
+    Gutter.Font.Height = -11
+    Gutter.Font.Name = 'Courier New'
+    Gutter.Font.Style = []
+    Gutter.LeftOffset = 4
+    Gutter.ShowLineNumbers = True
+    Gutter.Width = 4
+    Options = [eoAutoIndent, eoDragDropEditing, eoEnhanceEndKey, eoGroupUndo, eoScrollPastEol, eoSmartTabDelete, eoSmartTabs, eoTabsToSpaces]
+    RightEdgeColor = 14548848
+    FontSmoothing = fsmNone
+  end
+  object Memo2: TSynMemo
+    Left = 557
+    Top = 41
+    Width = 465
+    Height = 522
+    Align = alClient
+    Ctl3D = True
+    ParentCtl3D = False
+    Font.Charset = DEFAULT_CHARSET
+    Font.Color = clWindowText
+    Font.Height = -13
+    Font.Name = 'Courier New'
+    Font.Style = []
+    TabOrder = 3
+    Gutter.AutoSize = True
+    Gutter.Color = 15400872
+    Gutter.BorderColor = 14548848
+    Gutter.Font.Charset = DEFAULT_CHARSET
+    Gutter.Font.Color = clWindowText
+    Gutter.Font.Height = -11
+    Gutter.Font.Name = 'Courier New'
+    Gutter.Font.Style = []
+    Gutter.LeftOffset = 4
+    Gutter.ShowLineNumbers = True
+    Gutter.Width = 4
+    Options = [eoAutoIndent, eoDragDropEditing, eoEnhanceEndKey, eoGroupUndo, eoScrollPastEol, eoSmartTabDelete, eoSmartTabs, eoTabsToSpaces]
+    RightEdgeColor = 14548848
+    FontSmoothing = fsmNone
   end
   object Timer1: TTimer
     Interval = 100

@@ -17,6 +17,11 @@
  --------------------------------------------------------------------
   更新记录
  --------------------------------------------------------------------
+ ver 1.0.24 2018.01.25
+ --------------------------------------------------------------------
+  * 修复已知Bug
+  
+ --------------------------------------------------------------------
  ver 1.0.23 2017.12.18
  --------------------------------------------------------------------
   * 优化 CatValue 代码，大幅提升ToString性能
@@ -964,8 +969,8 @@ var
   JsonTimeFormat: JSONString = 'hh:nn:ss.zzz';
   //日期时间类型转换为Json数据时会转换成字符串，这个变量控制如何格式化
   JsonDateTimeFormat: JSONString = 'yyyy-mm-dd hh:nn:ss.zzz';
-  //浮点数精度
-  JsonFloatDigits: Integer = 8;
+  //浮点数精度 (0 自动)
+  JsonFloatDigits: Integer = 0;
   //Json 严格模式下日期类型的精度，默认为毫秒，可以设置为秒以便与某些系统兼容
   JsonDatePrecision: TJsonDatePrecision = jdpMillisecond;
   //Json 日期时间格式化样式
@@ -974,6 +979,8 @@ var
   JsonIntToTimeStyle: TJsonIntToTimeStyle;
   //blob转字符串是否使用Base64
   JsonBlobBase64: Boolean = True;
+  //Json 名称后面跟一个空格
+  JsonNameAfterSpace: Boolean = False;
 
 {$IFNDEF USEYxdStr}
 function StrDupX(const s: PJSONChar; ACount:Integer): JSONString;
@@ -1108,6 +1115,7 @@ resourcestring
   SParamMissed = '参数 %s 同名的结点未找到.';
   SMethodMissed = '指定的函数 %s 不存在.';
   SObjectChildNeedName = '对象 %s 的第 %d 个子结点名称未赋值, 编码输出前必需赋值.';
+  SExpectingEOF = '期望EOF: ';
 
 const
   EParse_Unknown            = -1;
@@ -1119,16 +1127,18 @@ const
   EParse_BadNameStart       = 6;
   EParse_BadNameEnd         = 7;
   EParse_NameNotFound       = 8;
+  EParse_ExpectingEOF       = 9;
 
 const
   CharStringStart:  PJSONChar = '"';
   CharStringEnd:    PJSONChar = '",';
-  CharNameEnd:      PJSONChar = '":';
+  CharNameEnd:      PJSONChar = '": ';
   CharArrayStart:   PJSONChar = '[';
   CharArrayEnd:     PJSONChar = '],';
   CharObjectStart:  PJSONChar = '{';
   CharObjectEnd:    PJSONChar = '},';
   CharObjectEmpty:  PJSONChar = '{} ';
+  CharArrayEmpty:   PJSONChar = '[] ';
   CharNull:         PJSONChar = 'null,';
   CharFalse:        PJSONChar = 'false,';
   CharTrue:         PJSONChar = 'true,';
@@ -2337,6 +2347,10 @@ begin
     Result := ParseHexInt(s);
     Exit;
   end else if (s^='0') and ((s[1]='x') or (s[1]='X')) then begin
+    if StrictJson then begin
+      Result := False;
+      Exit;
+    end; 
     Inc(s, 2);
     Result := ParseHexInt(s);
     Exit;
@@ -3422,7 +3436,7 @@ begin
           Inc(pd, 2);
         end;
       else begin
-        if ps^ < #$1F then begin
+         if ps^ < #$1F then begin
           PInt4Char(pd)^ := PInt4Char(CharCode)^;
           Inc(pd, 4);
           if ps^ > #$F then
@@ -3432,7 +3446,7 @@ begin
           Inc(pd);
           pd^ := LowerHexChars[Ord(p^) and $0F];
           Inc(pd);
-        end else if (ps^ <= #$7E) or (not ADoEscape) then begin//英文字符区
+        end else if (p^ <= #$7E) or (not ADoEscape) then begin//英文字符区
           pd^ := p^;
           Inc(pd);
         end else begin
@@ -3441,7 +3455,8 @@ begin
           {$IFDEF JSON_UNICODE}
           w := PWord(p)^;
           {$ELSE}
-          w := PWord(AnsiDecode(ps, 2))^;
+          w := PWord(AnsiDecode(p, 2))^;
+          Inc(P);
           {$ENDIF}
           pd^ := LowerHexChars[(w shr 12) and $0F];
           Inc(pd);
@@ -4145,6 +4160,14 @@ begin
     SetString(Result, Buffer, I);
 end;
 
+function FloatToStrEx(const Value: Extended): string;
+var
+  Buffer: array[0..63] of Char;
+begin
+  SetString(Result, Buffer, FloatToText(Buffer, Value, fvExtended,
+    ffGeneral, 15, 0));
+end;
+
 procedure WriteVarArrayToStream(pvVar: Variant; pvStream: TStream);
 var
   L: Integer;
@@ -4186,7 +4209,10 @@ begin
     jdtInteger:
       Result := IntToStr(AsInteger);
     jdtFloat:
-      Result := FloatToStr(AsFloat);
+      if JsonFloatDigits <= 0 then
+        Result := FloatToStrEx(AsFloat)
+      else
+        Result := FloatToStr(AsFloat);
     jdtBoolean:
       Result := BoolToStr(AsBoolean);
     jdtObject:
@@ -4341,7 +4367,7 @@ begin
   case p^ of
     'b':
       begin
-        {$IFDEF JSON_UNICODE}Result := #7;{$ELSE}ABuilder.Cat(#7);{$ENDIF}
+        {$IFDEF JSON_UNICODE}Result := #8;{$ELSE}ABuilder.Cat(#8);{$ENDIF}
         Inc(p);
       end;
     't':
@@ -4557,7 +4583,10 @@ begin
     try
       {$IFDEF JSON_UNICODE}SkipSpaceW(p);{$ELSE}SkipSpaceA(p);{$ENDIF}
       ErrCode := ParseJsonPair(ABuilder, p);
-      if ErrCode <> 0 then
+      if (p^ <> #0) and StrictJson then begin
+        ErrCode := EParse_ExpectingEOF;
+      end;
+      if (ErrCode <> 0) then
         RaiseParseException(ErrCode, ps, p);
     finally
       ABuilder.Free;
@@ -4785,13 +4814,12 @@ var
         if Item = nil then Continue;
         if (AIndent > 0) then begin
           ABuilder.Cat(SLineBreak);
-          //ABuilder.Space(AIndent * (ALevel + 1));
           ABuilder.Replicate(AIndentStr, ALevel + 1);
         end;
-        if Length(item.FName) > 0 then begin
+        if (item.FName <> '') or (not IsArray) then begin
           ABuilder.Cat(CharStringStart, 1);
           CatValue(ABuilder, item.FName, ADoEscape);
-          ABuilder.Cat(CharNameEnd, 2);
+          ABuilder.Cat(CharNameEnd, 2 + Ord(JsonNameAfterSpace));
         end;
         case Item.FType of
           jdtObject:
@@ -4817,7 +4845,10 @@ var
             end;
           jdtFloat:
             begin
-              ABuilder.Cat(FloatToStr(Item.AsFloat));
+              if JsonFloatDigits <= 0 then
+                ABuilder.Cat(FloatToStrEx(Item.AsFloat))
+              else
+                ABuilder.Cat(FloatToStr(Item.AsFloat));
               ABuilder.Cat(CharComma, 1);
             end;
           jdtBoolean:
@@ -4847,7 +4878,11 @@ var
       end;
       ABuilder.Back(1);
     end else if Assigned(ANode.FParent) then begin
-      ABuilder.Cat(CharNull, 5);
+      if ANode.GetIsArray then
+        ABuilder.Cat(CharArrayEmpty, 2)
+      else
+        ABuilder.Cat(CharObjectEmpty, 2);
+      ABuilder.Cat(CharComma, 1);
       Exit;
     end else begin
       ABuilder.Cat(CharObjectEmpty, 3);
@@ -4856,8 +4891,7 @@ var
 
     if AIndent > 0 then begin
       ABuilder.Cat(SLineBreak);
-      //ABuilder.Space(AIndent * ALevel);
-      ABuilder.Replicate(AIndentStr, ALevel + 1);
+      ABuilder.Replicate(AIndentStr, ALevel);
     end;
 
     if IsArray then begin
@@ -5189,10 +5223,10 @@ begin
         Result := EParse_BadNameEnd;
         Exit;
       end;
-      if ABuilder.Position = 0 then begin
-        Result := EParse_NameNotFound;
-        Exit;
-      end;
+      //if ABuilder.Position = 0 then begin
+      //  Result := EParse_NameNotFound;
+      //  Exit;
+      //end;  // 名称允许为空 by 2018.01.25
       Inc(p);
       {$IFDEF JSON_UNICODE}SkipSpaceW{$ELSE}SkipSpaceA{$ENDIF}(p);
       //解析值
@@ -5599,7 +5633,9 @@ begin
       EParse_BadNameEnd:
         raise Exception.Create(FormatParseError(ACode,SBadNameEnd, ps,p));
       EParse_NameNotFound:
-        raise Exception.Create(FormatParseError(ACode,SNameNotFound, ps,p))
+        raise Exception.Create(FormatParseError(ACode,SNameNotFound, ps,p));
+      EParse_ExpectingEOF:
+        raise Exception.Create(FormatParseError(ACode, SExpectingEOF, ps, p))
       else
         raise Exception.Create(FormatParseError(ACode,SUnknownError, ps,p));
     end;
