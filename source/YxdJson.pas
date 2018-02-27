@@ -872,6 +872,7 @@ type
   protected
     function GetIsArray: Boolean; override;
   public
+    procedure AddNull();
     procedure Add(Value: Boolean); overload;
     procedure Add(Value: Integer); overload;
     procedure Add(Value: Word); overload;
@@ -7243,6 +7244,11 @@ end;
 procedure JSONArray.addJSON(const value: JSONString; AType: JsonDataType);
 begin
   putJSON('', value, AType);
+end;
+
+procedure JSONArray.AddNull;
+begin
+  NewJsonValue().FType := jdtNull;
 end;
 
 function JSONArray.Clone: JSONArray;
