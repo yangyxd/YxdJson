@@ -2,8 +2,8 @@ object Form1: TForm1
   Left = 0
   Top = 0
   Caption = 'JSON Checker  - '#21487#25302#20837#27979#35797'Json'#25991#20214
-  ClientHeight = 582
-  ClientWidth = 1022
+  ClientHeight = 654
+  ClientWidth = 1128
   Color = clBtnFace
   Font.Charset = DEFAULT_CHARSET
   Font.Color = clWindowText
@@ -18,18 +18,19 @@ object Form1: TForm1
     Left = 553
     Top = 41
     Width = 4
-    Height = 522
+    Height = 594
     ExplicitTop = 0
     ExplicitHeight = 690
   end
   object Panel1: TPanel
     Left = 0
     Top = 0
-    Width = 1022
+    Width = 1128
     Height = 41
     Align = alTop
     BevelOuter = bvNone
     TabOrder = 0
+    ExplicitWidth = 1022
     object Label2: TLabel
       Left = 446
       Top = 15
@@ -77,6 +78,7 @@ object Form1: TForm1
       Top = 12
       Width = 63
       Height = 21
+      ImeName = #20013#25991'('#31616#20307') - '#25628#29399#20116#31508#36755#20837#27861
       TabOrder = 4
       Text = '1'
     end
@@ -122,8 +124,8 @@ object Form1: TForm1
   end
   object StatusBar1: TStatusBar
     Left = 0
-    Top = 563
-    Width = 1022
+    Top = 635
+    Width = 1128
     Height = 19
     Panels = <
       item
@@ -132,12 +134,14 @@ object Form1: TForm1
       item
         Width = 300
       end>
+    ExplicitTop = 563
+    ExplicitWidth = 1022
   end
   object Memo1: TSynMemo
     Left = 0
     Top = 41
     Width = 553
-    Height = 522
+    Height = 594
     Align = alLeft
     Ctl3D = True
     ParentCtl3D = False
@@ -146,7 +150,9 @@ object Form1: TForm1
     Font.Height = -13
     Font.Name = 'Courier New'
     Font.Style = []
+    PopupMenu = PopupMenu1
     TabOrder = 2
+    OnMouseDown = Memo1MouseDown
     Gutter.AutoSize = True
     Gutter.Color = 15400872
     Gutter.BorderColor = 14548848
@@ -158,15 +164,20 @@ object Form1: TForm1
     Gutter.LeftOffset = 4
     Gutter.ShowLineNumbers = True
     Gutter.Width = 4
-    Options = [eoAutoIndent, eoDragDropEditing, eoEnhanceEndKey, eoGroupUndo, eoScrollPastEol, eoSmartTabDelete, eoSmartTabs, eoTabsToSpaces]
+    ImeName = #20013#25991'('#31616#20307') - '#25628#29399#20116#31508#36755#20837#27861
+    Options = [eoAutoIndent, eoAutoSizeMaxScrollWidth, eoDragDropEditing, eoEnhanceEndKey, eoGroupUndo, eoSmartTabDelete, eoSmartTabs, eoTabsToSpaces, eoTrimTrailingSpaces]
     RightEdgeColor = 14548848
+    WordWrap = True
     FontSmoothing = fsmNone
+    ExplicitLeft = -2
+    ExplicitTop = 39
+    ExplicitHeight = 522
   end
   object Memo2: TSynMemo
     Left = 557
     Top = 41
-    Width = 465
-    Height = 522
+    Width = 571
+    Height = 594
     Align = alClient
     Ctl3D = True
     ParentCtl3D = False
@@ -175,7 +186,9 @@ object Form1: TForm1
     Font.Height = -13
     Font.Name = 'Courier New'
     Font.Style = []
+    PopupMenu = PopupMenu1
     TabOrder = 3
+    OnMouseDown = Memo1MouseDown
     Gutter.AutoSize = True
     Gutter.Color = 15400872
     Gutter.BorderColor = 14548848
@@ -187,14 +200,70 @@ object Form1: TForm1
     Gutter.LeftOffset = 4
     Gutter.ShowLineNumbers = True
     Gutter.Width = 4
-    Options = [eoAutoIndent, eoDragDropEditing, eoEnhanceEndKey, eoGroupUndo, eoScrollPastEol, eoSmartTabDelete, eoSmartTabs, eoTabsToSpaces]
+    ImeName = #20013#25991'('#31616#20307') - '#25628#29399#20116#31508#36755#20837#27861
+    Options = [eoAutoIndent, eoAutoSizeMaxScrollWidth, eoDragDropEditing, eoEnhanceEndKey, eoGroupUndo, eoSmartTabDelete, eoSmartTabs, eoTabsToSpaces]
     RightEdgeColor = 14548848
     FontSmoothing = fsmNone
+    ExplicitWidth = 465
+    ExplicitHeight = 522
   end
   object Timer1: TTimer
     Interval = 100
     OnTimer = Timer1Timer
     Left = 640
     Top = 320
+  end
+  object PopupMenu1: TPopupMenu
+    OnPopup = PopupMenu1Popup
+    Left = 480
+    Top = 264
+    object N1: TMenuItem
+      Caption = #25764#28040'(&U)'
+      OnClick = N1Click
+    end
+    object R1: TMenuItem
+      Caption = #37325#20570'(&R)'
+      OnClick = R1Click
+    end
+    object N3: TMenuItem
+      Caption = '-'
+    end
+    object N5: TMenuItem
+      Caption = #26032#24314'(&N)'
+      OnClick = N5Click
+    end
+    object N2: TMenuItem
+      Caption = '-'
+    end
+    object X1: TMenuItem
+      Caption = #21098#20999'(&X)'
+      OnClick = X1Click
+    end
+    object C1: TMenuItem
+      Caption = #22797#21046'(&C)'
+      OnClick = C1Click
+    end
+    object P1: TMenuItem
+      Caption = #31896#36148'(&P)'
+      OnClick = P1Click
+    end
+    object C2: TMenuItem
+      Caption = #28165#31354'(&C)'
+      OnClick = C2Click
+    end
+    object N4: TMenuItem
+      Caption = '-'
+    end
+    object A1: TMenuItem
+      Caption = #20840#36873'(&A)'
+      OnClick = A1Click
+    end
+    object N6: TMenuItem
+      Caption = '-'
+    end
+    object W1: TMenuItem
+      Caption = #33258#21160#25442#34892'(&W)'
+      OnClick = W1Click
+    end
   end
 end

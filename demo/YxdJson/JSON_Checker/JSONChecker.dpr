@@ -10,6 +10,7 @@ begin
   ReportMemoryLeaksOnShutdown := True;
   Application.Initialize;
   Application.MainFormOnTaskbar := True;
+  Application.Title := 'JSON View';
   Application.CreateForm(TForm1, Form1);
   Application.Run;
 end.

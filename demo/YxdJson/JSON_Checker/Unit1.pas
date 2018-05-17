@@ -5,7 +5,7 @@ interface
 uses
   YxdJson, YxdStr, ShellAPI,
   Windows, Messages, SysUtils, Variants, Classes, Graphics, Controls, Forms,
-  Dialogs, ExtCtrls, StdCtrls, ComCtrls, SynEdit, SynMemo;
+  Dialogs, ExtCtrls, StdCtrls, ComCtrls, SynEdit, SynMemo, Menus;
 
 type
   TForm1 = class(TForm)
@@ -25,17 +25,44 @@ type
     Memo2: TSynMemo;
     chkR: TCheckBox;
     chkW: TCheckBox;
+    PopupMenu1: TPopupMenu;
+    N1: TMenuItem;
+    N2: TMenuItem;
+    R1: TMenuItem;
+    X1: TMenuItem;
+    C1: TMenuItem;
+    P1: TMenuItem;
+    C2: TMenuItem;
+    N3: TMenuItem;
+    A1: TMenuItem;
+    N4: TMenuItem;
+    N5: TMenuItem;
+    N6: TMenuItem;
+    W1: TMenuItem;
     procedure CheckBox1Click(Sender: TObject);
     procedure CheckBox2Click(Sender: TObject);
     procedure Button1Click(Sender: TObject);
     procedure FormCreate(Sender: TObject);
     procedure Timer1Timer(Sender: TObject);
     procedure CheckBox5Click(Sender: TObject);
+    procedure N1Click(Sender: TObject);
+    procedure R1Click(Sender: TObject);
+    procedure X1Click(Sender: TObject);
+    procedure C1Click(Sender: TObject);
+    procedure P1Click(Sender: TObject);
+    procedure C2Click(Sender: TObject);
+    procedure A1Click(Sender: TObject);
+    procedure N5Click(Sender: TObject);
+    procedure PopupMenu1Popup(Sender: TObject);
+    procedure W1Click(Sender: TObject);
+    procedure Memo1MouseDown(Sender: TObject; Button: TMouseButton;
+      Shift: TShiftState; X, Y: Integer);
   private
     { Private declarations }
     procedure WMDropFiles(var Msg: TWMDropFiles); message WM_DROPFILES;
   public
     { Public declarations }
+    function FocusEdit(): TSynMemo;
   end;
 
 var
@@ -44,6 +71,11 @@ var
 implementation
 
 {$R *.dfm}
+
+procedure TForm1.A1Click(Sender: TObject);
+begin
+  FocusEdit.SelectAll;
+end;
 
 procedure TForm1.Button1Click(Sender: TObject);
 var
@@ -103,6 +135,16 @@ begin
   end;
 end;
 
+procedure TForm1.C1Click(Sender: TObject);
+begin
+  FocusEdit.CopyToClipboard;
+end;
+
+procedure TForm1.C2Click(Sender: TObject);
+begin
+  FocusEdit.Clear;
+end;
+
 procedure TForm1.CheckBox1Click(Sender: TObject);
 begin
   YxdJson.StrictJson := TCheckBox(Sender).Checked;
@@ -121,10 +163,61 @@ begin
   JsonNameAfterSpace := CheckBox5.Checked;
 end;
 
+function TForm1.FocusEdit: TSynMemo;
+begin
+  if Memo1.Focused then
+    Result := Memo1
+  else
+    Result := Memo2;
+end;
+
 procedure TForm1.FormCreate(Sender: TObject);
 begin
   DragAcceptFiles(Handle, True);
   JsonNameAfterSpace := True;
+end;
+
+procedure TForm1.Memo1MouseDown(Sender: TObject; Button: TMouseButton;
+  Shift: TShiftState; X, Y: Integer);
+begin
+  if (not TSynMemo(Sender).Focused) and (TSynMemo(Sender).CanFocus) then
+    TSynMemo(Sender).SetFocus;
+end;
+
+procedure TForm1.N1Click(Sender: TObject);
+begin
+  FocusEdit.Undo;
+end;
+
+procedure TForm1.N5Click(Sender: TObject);
+begin
+  FocusEdit.ClearAll;
+end;
+
+procedure TForm1.P1Click(Sender: TObject);
+begin
+  FocusEdit.PasteFromClipboard;
+end;
+
+procedure TForm1.PopupMenu1Popup(Sender: TObject);
+var
+  Edit: TSynMemo;
+begin
+  Edit := FocusEdit;
+  try
+    N1.Enabled := Edit.CanUndo;
+    R1.Enabled := Edit.CanRedo;
+    X1.Enabled := Edit.SelLength > 0;
+    C1.Enabled := X1.Enabled;
+    P1.Enabled := Edit.CanPaste;
+    W1.Checked := Edit.WordWrap;
+  except
+  end;
+end;
+
+procedure TForm1.R1Click(Sender: TObject);
+begin
+  FocusEdit.Redo;
 end;
 
 procedure TForm1.Timer1Timer(Sender: TObject);
@@ -138,6 +231,11 @@ begin
   else
     Exit;
   StatusBar1.Panels.Items[0].Text := Format('列: %d 当前选择：%d', [O.CaretX, O.SelLength]);
+end;
+
+procedure TForm1.W1Click(Sender: TObject);
+begin
+  FocusEdit.WordWrap := not FocusEdit.WordWrap;
 end;
 
 procedure TForm1.WMDropFiles(var Msg: TWMDropFiles);
@@ -162,6 +260,11 @@ begin
     end;
     Break;
   end;
+end;
+
+procedure TForm1.X1Click(Sender: TObject);
+begin
+  FocusEdit.CutToClipboard;
 end;
 
 end.
