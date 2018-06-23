@@ -17,6 +17,10 @@
  --------------------------------------------------------------------
   更新记录
  --------------------------------------------------------------------
+ ver 1.0.25 2018.06.23
+ * 修复ParseNumeric函数解析负数时的bug (感谢网友：［济南］爱上Delphi)
+ 
+ --------------------------------------------------------------------
  ver 1.0.24 2018.01.25
  --------------------------------------------------------------------
   * 修复已知Bug
@@ -2544,25 +2548,20 @@ var
     if ANeg then
       Inc(S);
     ParseInt(s, iVal);
-    if ANeg then
-      ANum := -iVal
-    else
-      ANum := iVal;
+    ANum := iVal;
     if s^='.' then begin //小数部分
       Inc(s);
       ACount := ParseInt(s, iVal);
-      if ACount > 0 then begin
-        if ANum < 0 then
-          ANum := ANum - iVal / IntPower(10, ACount)
-        else 
-          ANum := ANum + iVal / IntPower(10, ACount);
-      end;
+      if ACount > 0 then 
+        ANum := ANum + iVal / IntPower(10, ACount);
     end;
     if (s^='e') or (s^='E') then begin
       Inc(s);
       if ParseNumeric(s, APow) then
         ANum := ANum * Power(10, APow);
     end;
+    if ANeg then
+      ANum := -ANum;
     Result := (s <> ps);
   end;
 
