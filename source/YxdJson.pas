@@ -5366,8 +5366,8 @@ function JSONBase.ParseValue(ABuilder: TStringCatHelper;
   var p: PJSONChar; const FName: JSONString): Integer;
 const
   JsonEndChars: PJSONChar = ',}]';
-  MaxInt64: Int64 = 9223372036854775807;
-  MinInt64: Int64 = -9223372036854775808;
+  MaxInt64: Int64 = High(Int64); // 9223372036854775807;
+  MinInt64: Int64 = Low(Int64); // -9223372036854775808;
 var
   ANum: Extended;
 begin
