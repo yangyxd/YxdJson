@@ -1436,7 +1436,7 @@ begin
     end;
 
     if not ADest.Active then begin
-      if ADest is TClientDataSet then begin
+      if (ADest is TClientDataSet) or (ADest.ClassName = 'TClientDataSet') then begin
         TClientDataSet(ADest).CreateDataSet;
       end else
         ADest.Open;
