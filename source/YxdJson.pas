@@ -5935,6 +5935,7 @@ begin
       obj.FValue := nil;
       FItems.Delete(i);
       FreeJsonValue(Item);
+      Break;
     end;
   end;
 end;
