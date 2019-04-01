@@ -521,7 +521,12 @@ type
 
     function TryParse(const text: JSONString): Boolean; overload;
     function TryParse(p: PJSONChar; len: Integer = -1): Boolean; overload;
-    
+
+    procedure Sort(Compare: TListSortCompare); overload;
+    {$IFDEF UNICODE}
+    procedure Sort(Compare: TListSortCompareFunc); overload;
+    {$ENDIF}
+
     /// <summary>
     /// 解析字符串， IgnoreZero 为 True时，将源字符串中的 #0 转为 #32 后再解析
     /// </summary>
@@ -3872,7 +3877,7 @@ begin
   end else
     Result := '';
 end;
-{$ENDIF} 
+{$ENDIF}
 
 { JSONValue }
 
@@ -6090,6 +6095,91 @@ procedure JSONBase.SetValue(const Value: JSONString);
 begin
   Decode(Value);
 end;
+
+
+procedure QuickSort(SortList: JSONList; L, R: Integer;
+  SCompare: TListSortCompare);
+var
+  I, J: Integer;
+  P, T: Pointer;
+begin
+  repeat
+    I := L;
+    J := R;
+    P := SortList[(L + R) shr 1];
+    repeat
+      while SCompare(SortList[I], P) < 0 do
+        Inc(I);
+      while SCompare(SortList[J], P) > 0 do
+        Dec(J);
+      if I <= J then
+      begin
+        if I <> J then
+        begin
+          T := SortList[I];
+          SortList[I] := SortList[J];
+          SortList[J] := T;
+        end;
+        Inc(I);
+        Dec(J);
+      end;
+    until I > J;
+    if L < J then
+      QuickSort(SortList, L, J, SCompare);
+    L := I;
+  until I >= R;
+end;
+
+procedure JSONBase.Sort(Compare: TListSortCompare);
+begin
+  if (Count > 1) and Assigned(Compare) then
+    QuickSort(FItems, 0, Count - 1, Compare);
+end;
+
+{$IFDEF UNICODE}
+procedure QuickSortA(SortList: JSONList; L, R: Integer;
+  SCompare: TListSortCompareFunc);
+var
+  I, J: Integer;
+  P, T: Pointer;
+begin
+  repeat
+    I := L;
+    J := R;
+    P := SortList[(L + R) shr 1];
+    repeat
+      while SCompare(SortList[I], P) < 0 do
+        Inc(I);
+      while SCompare(SortList[J], P) > 0 do
+        Dec(J);
+      if I <= J then
+      begin
+        if I <> J then
+        begin
+          T := SortList[I];
+          SortList[I] := SortList[J];
+          SortList[J] := T;
+        end;
+        Inc(I);
+        Dec(J);
+      end;
+    until I > J;
+    if L < J then
+      QuickSortA(SortList, L, J, SCompare);
+    L := I;
+  until I >= R;
+end;
+
+procedure JSONBase.Sort(Compare: TListSortCompareFunc);
+begin
+  if Count > 1 then
+    QuickSortA(FItems, 0, Count - 1,
+      function(Item1, Item2: Pointer): Integer
+      begin
+        Result := Compare(Item1, Item2);
+      end);
+end;
+{$ENDIF}
 
 {$IFDEF JSON_UNICODE}
 function JSONBase.toString: JSONString;
