@@ -582,6 +582,10 @@ type
     /// <param name="AName">要查找的结点名称</param>
     /// <returns>返回索引值，未找到返回-1</returns>
     function IndexOf(const Key: JSONString): Integer; virtual;
+
+    function IndexOfObject(const Value: JSONBase): Integer;
+    function IndexOfItem(const Item: PJSONValue): Integer;
+
     /// <summary>判断指定名称的结点是否存在</summary>
     /// <param name="AName">结点名称</param>
     function Exist(const Key: JSONString): Boolean;
@@ -4996,6 +5000,21 @@ begin
   Result := Encode(Self);
 end;
 
+function JSONBase.IndexOfObject(const Value: JSONBase): Integer;
+var
+  I: Integer;
+  Item: PJSONValue;
+begin
+  Result := -1;
+  for I := 0 to FItems.Count - 1 do begin
+    Item := FItems.Items[i];
+    if Item.FObject = Value then begin
+      Result := I;
+      Break;
+    end;
+  end;
+end;
+
 function JSONBase.IndexOf(const Key: JSONString): Integer;
 var
   Item: PJSONValue;
@@ -5024,6 +5043,11 @@ begin
       end;
     end;
   end;
+end;
+
+function JSONBase.IndexOfItem(const Item: PJSONValue): Integer;
+begin
+  Result := FItems.IndexOf(Item);
 end;
 
 class function JSONBase.InternalEncode(Obj: JSONBase; ABuilder: TStringCatHelper;
