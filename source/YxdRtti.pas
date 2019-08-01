@@ -2829,6 +2829,8 @@ class procedure TYxdSerialize.writeValue(aOut: JSONBase; const key: JSONString; 
             {$ENDIF}
           tkInt64:
             JSONObject(aOut).put(AName, GetInt64Prop(AObj,APropList[J]));
+          tkFloat:
+            JSONObject(aOut).Put(AName, GetFloatProp(AObj, APropList[J]));
           tkRecord, tkArray, tkDynArray://记录、数组、动态数组属性系统也不保存，也没提供所有太好的接口
             raise Exception.Create(SUnsupportPropertyType);
         end;
