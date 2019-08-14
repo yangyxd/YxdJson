@@ -654,6 +654,7 @@ begin
         end;
       end;
       Inc(pb_s);
+      Dec(len_s);
     end;
   end else if len_s = len_sub then begin
     if CompareMem(S, sub, len_s) then
