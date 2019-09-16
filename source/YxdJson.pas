@@ -591,6 +591,11 @@ type
     function IndexOfObject(const Value: JSONBase): Integer;
     function IndexOfItem(const Item: PJSONValue): Integer;
 
+    /// <summary>
+    /// 交换两项的位置
+    /// </summary>
+    procedure ExchangeItem(const AItemIndex, BItemIndex: Integer);
+
     /// <summary>判断指定名称的结点是否存在</summary>
     /// <param name="AName">结点名称</param>
     function Exist(const Key: JSONString): Boolean;
@@ -4924,6 +4929,15 @@ end;
 function JSONBase.Encode(AIndent: Integer; ADoEscape: Boolean): JSONString;
 begin
   Encode(Self, AIndent, ADoEscape);
+end;
+
+procedure JSONBase.ExchangeItem(const AItemIndex, BItemIndex: Integer);
+var
+  T: Pointer;
+begin
+  T := FItems[AItemIndex];
+  FItems[AItemIndex] := FItems[BItemIndex];
+  FItems[BItemIndex] := T;
 end;
 
 function JSONBase.Exist(const Key: JSONString): Boolean;
