@@ -595,6 +595,10 @@ type
     /// 交换两项的位置
     /// </summary>
     procedure ExchangeItem(const AItemIndex, BItemIndex: Integer);
+    /// <summary>
+    /// 移动位置
+    /// </summary>
+    procedure MoveItem(const AItemIndex, ANewIndex: Integer);
 
     /// <summary>判断指定名称的结点是否存在</summary>
     /// <param name="AName">结点名称</param>
@@ -5357,6 +5361,11 @@ begin
     Decode(PJSONChar(S), Length(S))
   else
     raise Exception.Create(SBadJson);
+end;
+
+procedure JSONBase.MoveItem(const AItemIndex, ANewIndex: Integer);
+begin
+  FItems.Move(AItemIndex, ANewIndex);
 end;
 
 function JSONBase.NewChildArray(const key: JSONString): JSONArray;
